@@ -10,6 +10,7 @@
 # standard output and the exit status must be the same.
 #
 # The script needs a C compiler (CC, default cc) and standard shell tools.
+# Part 3 also uses a Go compiler (GO, default go) when there is one.
 # It writes only below the directory build/.
 
 set -u
@@ -92,6 +93,41 @@ expect_error "text without quotes" "must be in double quotes" "%%syntax const x"
 expect_error "open quote"        "no closing double quote" "%%syntax const \"x"
 expect_error "destructor with template syntax" "A destructor needs" "%%syntax file-suffix \".x\""
 EXTRA_OPTS=-m expect_error "option -m with template syntax" "The option -m needs" "%%syntax file-suffix \".x\""
+
+# Part 3 builds the same calculator with each template and runs it on the
+# same inputs. Every parser must print the lines of test/calc/expected.txt.
+# A language without a compiler on this machine is skipped.
+check_calc() {
+  lang=$1; out=$2
+  if [ -f "$out" ] && cmp -s "$out" "$ROOT/test/calc/expected.txt"; then
+    pass "calculator in $lang: $(wc -l <"$out" | tr -d " ") results as expected"
+  else
+    fail "calculator in $lang (see $out)"
+  fi
+}
+
+echo "== part 3: the same calculator with each template"
+CALC="$BUILD/calc"
+mkdir -p "$CALC/c" "$CALC/go"
+
+( cd "$CALC/c" &&
+  "$BUILD/lemon" "-T$ROOT/tool/lempar.c" -d. "$ROOT/test/grammars/calc.y" &&
+  "$CC" -o calc -I. "$ROOT/test/calc/main.c" &&
+  ./calc "$ROOT/test/calc/inputs.txt" >result.txt ) >"$CALC/c/log.txt" 2>&1
+check_calc C "$CALC/c/result.txt"
+
+GO=${GO:-go}
+if command -v "$GO" >/dev/null 2>&1; then
+  ( cd "$CALC/go" &&
+    "$BUILD/lemon" "-T$ROOT/tool/lempar.go" -d. "$ROOT/test/calc/calc-go.y" &&
+    cp "$ROOT/test/calc/main.go" . &&
+    printf "module calctest\n\ngo 1.20\n" >go.mod &&
+    GOTOOLCHAIN=local GOFLAGS=-mod=mod "$GO" build -o calc . &&
+    ./calc "$ROOT/test/calc/inputs.txt" >result.txt ) >"$CALC/go/log.txt" 2>&1
+  check_calc Go "$CALC/go/result.txt"
+else
+  echo "skip  calculator in Go: no $GO command"
+fi
 
 echo "== result: $PASSED passed, $FAILED failed"
 [ "$FAILED" -eq 0 ]

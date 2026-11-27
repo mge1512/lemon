@@ -1,0 +1,18 @@
+1+2*3 => result=7 count=1 errors=0 accepted=1
+(1+2)*3 => result=9 count=1 errors=0 accepted=1
+2^3 => result=8 count=1 errors=0 accepted=1
+2^3^2 => result=64 count=1 errors=0 accepted=1
+-4+10 => result=6 count=1 errors=0 accepted=1
+10-3-2 => result=5 count=1 errors=0 accepted=1
+abs(0-5) => result=5 count=1 errors=0 accepted=1
+7/2, 8/0, 1 => result=4 count=3 errors=0 accepted=1
+1,2,3; => result=6 count=3 errors=0 accepted=1
+1,2;;3 => result=3 count=2 errors=1 accepted=1
+42 => result=42 count=1 errors=0 accepted=1
+1+ => result=0 count=0 errors=101 accepted=0
+1 2 => result=1 count=1 errors=1 accepted=1
+) => result=0 count=0 errors=101 accepted=0
+(1+2 => result=0 count=0 errors=101 accepted=0
+1+*2, 5 => result=8 count=2 errors=1 accepted=1
+((((((((((((((((((((((((... => result=1 count=1 errors=1001 accepted=1
+((((((((((((((((((((((((... => result=7 count=1 errors=0 accepted=1

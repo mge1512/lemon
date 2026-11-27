@@ -22,17 +22,23 @@ Started on 2026-11-27. This is work in progress.
 
 - [x] Original files of SQLite 3.54.1 in `upstream/`
 - [x] Test: C output identical to the original generator
-- [ ] Generator: syntax of the target language comes from the template
-- [ ] Template for Go
+- [x] Generator: syntax of the target language comes from the template
+- [x] Template for Go
 - [ ] Template for Rust
 
 ## Test
 
     sh test/run.sh
 
-The script needs a C compiler and standard shell tools. It builds the
-original generator and the changed generator, runs both on the grammars in
-`upstream/` and `test/grammars/`, and compares all output files.
+The script needs a C compiler and standard shell tools. It has three parts:
+
+1. It builds the original generator and the changed generator, runs both on
+   the grammars in `upstream/` and `test/grammars/`, and compares all output
+   files.
+2. It checks that the generator refuses wrong `%%syntax` lines.
+3. It builds one calculator with each template, runs the parsers on the
+   same inputs and compares the results. A language without a compiler on
+   the machine is skipped.
 
 ## Rules of this repository
 
