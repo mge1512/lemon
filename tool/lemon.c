@@ -4867,6 +4867,117 @@ static int notnull(const char *z){
 }
 
 
+/* Return the text of rule rp, in the form that writeRuleText() writes.
+** The result is in memory that the next call reuses.
+*/
+PRIVATE const char *tplt_rule_text(struct rule *rp){
+  static char *z = 0;
+  static int nAlloc = 0;
+  int n = lemonStrlen(rp->lhs->name) + 5;
+  int j, k;
+  for(j=0; j<rp->nrhs; j++){
+    struct symbol *sp = rp->rhs[j];
+    if( sp->type!=MULTITERMINAL ){
+      n += lemonStrlen(sp->name) + 1;
+    }else{
+      for(k=0; k<sp->nsubsym; k++) n += lemonStrlen(sp->subsym[k]->name) + 1;
+    }
+  }
+  if( n>nAlloc ){
+    nAlloc = n + 100;
+    z = (char*)lemon_realloc(z, nAlloc);
+  }
+  lemon_sprintf(z, "%s ::=", rp->lhs->name);
+  for(j=0; j<rp->nrhs; j++){
+    struct symbol *sp = rp->rhs[j];
+    if( sp->type!=MULTITERMINAL ){
+      lemon_sprintf(&z[lemonStrlen(z)], " %s", sp->name);
+    }else{
+      lemon_sprintf(&z[lemonStrlen(z)], " %s", sp->subsym[0]->name);
+      for(k=1; k<sp->nsubsym; k++){
+        lemon_sprintf(&z[lemonStrlen(z)], "|%s", sp->subsym[k]->name);
+      }
+    }
+  }
+  return z;
+}
+
+/* Write the start of the case for the reduce action of rule rp.  bNext is
+** false for the first rule of an action, and true for each further rule
+** that has the same action.
+*/
+PRIVATE void emit_case(FILE *out, int *lineno, struct rule *rp, int bNext){
+  if( tplt_custom() ){
+    tplt_emit(out, lineno, tplt_need(bNext ? "case-next" : "case-first"),
+              "VALUE", tplt_int(rp->iRule), "TEXT", tplt_rule_text(rp),
+              (char*)0);
+  }else{
+    fprintf(out,"      case %d: /* ", rp->iRule);
+    writeRuleText(out, rp);
+    if( bNext ){
+      fprintf(out," */ yytestcase(yyruleno==%d);\n", rp->iRule);
+    }else{
+      fprintf(out, " */\n");
+    }
+    (*lineno)++;
+  }
+}
+
+/* Write the text between the rules of a case and its action */
+PRIVATE void emit_case_begin(FILE *out, int *lineno){
+  if( tplt_custom() ){
+    tplt_emit(out, lineno, tplt_need("case-begin"), (char*)0);
+  }
+}
+
+/* Write the end of a case */
+PRIVATE void emit_case_end(FILE *out, int *lineno){
+  if( tplt_custom() ){
+    tplt_emit(out, lineno, tplt_need("case-end"), (char*)0);
+  }else{
+    fprintf(out,"        break;\n"); (*lineno)++;
+  }
+}
+
+/* Write the start of the case for all rules that have no action */
+PRIVATE void emit_default_begin(FILE *out, int *lineno){
+  if( tplt_custom() ){
+    tplt_emit(out, lineno, tplt_need("default-begin"), (char*)0);
+  }else{
+    fprintf(out,"      default:\n"); (*lineno)++;
+  }
+}
+
+/* Write one rule that has no action */
+PRIVATE void emit_default_item(FILE *out, int *lineno, struct rule *rp){
+  if( tplt_custom() ){
+    tplt_emit(out, lineno, tplt_need("default-item"),
+              "VALUE", tplt_int(rp->iRule), "TEXT", tplt_rule_text(rp),
+              (char*)0);
+    return;
+  }
+  fprintf(out,"      /* (%d) ", rp->iRule);
+  writeRuleText(out, rp);
+  if( rp->neverReduce ){
+    fprintf(out, " (NEVER REDUCES) */ assert(yyruleno!=%d);\n",
+            rp->iRule); (*lineno)++;
+  }else if( rp->doesReduce ){
+    fprintf(out, " */ yytestcase(yyruleno==%d);\n", rp->iRule); (*lineno)++;
+  }else{
+    fprintf(out, " (OPTIMIZED OUT) */ assert(yyruleno!=%d);\n",
+            rp->iRule); (*lineno)++;
+  }
+}
+
+/* Write the end of the case for all rules that have no action */
+PRIVATE void emit_default_end(FILE *out, int *lineno){
+  if( tplt_custom() ){
+    tplt_emit(out, lineno, tplt_need("default-end"), (char*)0);
+  }else{
+    fprintf(out,"        break;\n"); (*lineno)++;
+  }
+}
+
 /* Generate C source code for the parser */
 void ReportTable(
   struct lemon *lemp,
@@ -5582,41 +5693,28 @@ defines_done:
       /* No C code actions, so this will be part of the "default:" rule */
       continue;
     }
-    fprintf(out,"      case %d: /* ", rp->iRule);
-    writeRuleText(out, rp);
-    fprintf(out, " */\n"); lineno++;
+    emit_case(out, &lineno, rp, 0);
     for(rp2=rp->next; rp2; rp2=rp2->next){
       if( rp2->code==rp->code && rp2->codePrefix==rp->codePrefix
              && rp2->codeSuffix==rp->codeSuffix ){
-        fprintf(out,"      case %d: /* ", rp2->iRule);
-        writeRuleText(out, rp2);
-        fprintf(out," */ yytestcase(yyruleno==%d);\n", rp2->iRule); lineno++;
+        emit_case(out, &lineno, rp2, 1);
         rp2->codeEmitted = 1;
       }
     }
+    emit_case_begin(out, &lineno);
     emit_code(out,rp,lemp,&lineno);
-    fprintf(out,"        break;\n"); lineno++;
+    emit_case_end(out, &lineno);
     rp->codeEmitted = 1;
   }
   /* Finally, output the default: rule.  We choose as the default: all
   ** empty actions. */
-  fprintf(out,"      default:\n"); lineno++;
+  emit_default_begin(out, &lineno);
   for(rp=lemp->rule; rp; rp=rp->next){
     if( rp->codeEmitted ) continue;
     assert( rp->noCode );
-    fprintf(out,"      /* (%d) ", rp->iRule);
-    writeRuleText(out, rp);
-    if( rp->neverReduce ){
-      fprintf(out, " (NEVER REDUCES) */ assert(yyruleno!=%d);\n",
-              rp->iRule); lineno++;
-    }else if( rp->doesReduce ){
-      fprintf(out, " */ yytestcase(yyruleno==%d);\n", rp->iRule); lineno++;
-    }else{
-      fprintf(out, " (OPTIMIZED OUT) */ assert(yyruleno!=%d);\n",
-              rp->iRule); lineno++;
-    }
+    emit_default_item(out, &lineno, rp);
   }
-  fprintf(out,"        break;\n"); lineno++;
+  emit_default_end(out, &lineno);
   tplt_xfer(lemp->name,in,out,&lineno);
 
   /* Generate code which executes if a parse fails */

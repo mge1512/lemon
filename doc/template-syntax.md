@@ -130,8 +130,8 @@ and end in the template text.
 
 ## Names for cases
 
-The reduce actions and the destructors are the cases of a selection. Several
-rules can share one action.
+The reduce actions are the cases of a selection. Several rules can share one
+action.
 
 | Name | Placeholders | Meaning |
 |---|---|---|
@@ -147,7 +147,7 @@ rules can share one action.
 
 In C, the generator replaces each label of a rule in the action code with an
 expression that reads or writes the parser stack. Many languages need a
-different way. A custom template that defines `rhs-fetch` gets it:
+different way. A custom template gets this one:
 
 - The action code is copied without change. Only `@X` is replaced.
 - Before the action, the generator declares a local variable for each label.
