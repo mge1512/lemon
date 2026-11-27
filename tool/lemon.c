@@ -5364,7 +5364,13 @@ void ReportTable(
   /* The first %include directive begins with a C-language comment,
   ** then skip over the header comment of the template file
   */
-  if( lemp->include==0 ) lemp->include = "";
+  if( lemp->include==0 ){
+    /* An empty string with a newline before it.  tplt_print() reads the
+    ** character before the end of its text, and a string constant has no
+    ** character before an empty text. */
+    static char zNoInclude[] = "\n";
+    lemp->include = &zNoInclude[1];
+  }
   for(i=0; ISSPACE(lemp->include[i]); i++){
     if( lemp->include[i]=='\n' ){
       lemp->include += i+1;
