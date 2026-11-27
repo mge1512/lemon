@@ -45,14 +45,15 @@ What is not there:
 
 ## Use
 
-    cc -O2 -o lemon tool/lemon.c
-    ./lemon -Ttool/lempar.c  query.y
-    ./lemon -Ttool/lempar.go query.y
-    ./lemon -Ttool/lempar.rs query.y
+    cc -O2 -o lemongrass tool/lemon.c
+    ./lemongrass -Ttool/lempar.c  query.y
+    ./lemongrass -Ttool/lempar.go query.y
+    ./lemongrass -Ttool/lempar.rs query.y
 
-The first command builds the generator. The other commands write a parser
-for the grammar `query.y`: `query.c` with `query.h`, `query.go` or
-`query.rs`.
+The first command builds the generator. The examples call the program
+`lemongrass`, so that nobody takes it for an original `lemon` on the same
+machine. The other commands write a parser for the grammar `query.y`:
+`query.c` with `query.h`, `query.go` or `query.rs`.
 
 | Document | For |
 |---|---|
