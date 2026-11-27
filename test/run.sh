@@ -21,10 +21,13 @@
 # Part 5  The limits of the Go and Rust templates. A grammar that uses a
 #         feature without support must not compile, and the message of the
 #         compiler must name the feature.
-# Part 6  The version. The option -x prints the line of the original
-#         generator first and then the version of lemongrass. That version
-#         must be the newest one in CHANGELOG.md, and the manual page
-#         doc/lemongrass.1 must name the same version.
+# Part 6  The version and the help. The option -x prints the line of the
+#         original generator first and then the version of lemongrass. That
+#         version must be the newest release in CHANGELOG.md, and the
+#         manual page doc/lemongrass.1 must name the same version. The
+#         option --version prints the same lines. The option --help prints
+#         the usage and the options on standard output, and the manual page
+#         must have every option of that list.
 #
 # The script needs a C compiler (CC, default cc) and standard shell tools.
 # Parts 3 to 5 use a Go compiler (GO, default go) and a Rust compiler
@@ -328,7 +331,7 @@ fi
 # ---------------------------------------------------------------------------
 # Part 6
 
-echo "== part 6: the version"
+echo "== part 6: the version and the help"
 "$BUILD/lemon-orig" -x >"$BUILD/version-orig.txt" 2>&1
 "$BUILD/lemon"      -x >"$BUILD/version.txt" 2>&1
 if [ -s "$BUILD/version-orig.txt" ] &&
@@ -349,6 +352,31 @@ if [ -n "$want" ] && [ "$page" = "$want" ]; then
   pass "the manual page names the version $want"
 else
   fail "the manual page names the version '$page', CHANGELOG.md has '$want'"
+fi
+"$BUILD/lemon" --version >"$BUILD/version-long.txt" 2>&1
+if cmp -s "$BUILD/version-long.txt" "$BUILD/version.txt"; then
+  pass "the option --version prints the lines of the option -x"
+else
+  fail "the option --version does not print the lines of the option -x"
+fi
+"$BUILD/lemon" --help >"$BUILD/help.txt" 2>"$BUILD/help-err.txt"
+rc=$?
+if [ "$rc" -eq 0 ] && [ ! -s "$BUILD/help-err.txt" ] &&
+   sed -n 1p "$BUILD/help.txt" | grep -q '^Usage: ' &&
+   grep -q '^  -T<string> ' "$BUILD/help.txt"; then
+  pass "the option --help prints the usage and the options on standard output"
+else
+  fail "the option --help: exit status $rc or wrong output"
+fi
+missing=""
+for opt in $(sed -n 's/^  \(-[-A-Za-z]*\).*$/\1/p' "$BUILD/help.txt"); do
+  roff=$(printf '%s' "$opt" | sed 's/-/\\-/g')
+  grep -q -F -e "$roff" "$ROOT/doc/lemongrass.1" || missing="$missing $opt"
+done
+if [ -s "$BUILD/help.txt" ] && [ -z "$missing" ]; then
+  pass "the manual page has every option of the list of --help"
+else
+  fail "the manual page does not have these options:$missing"
 fi
 
 echo "== result: $PASSED passed, $FAILED failed, $SKIPPED skipped"

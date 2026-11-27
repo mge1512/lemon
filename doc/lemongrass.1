@@ -8,7 +8,9 @@ lemongrass \- LALR(1) parser generator with templates for C, Go and Rust
 .RI [ option ...]
 .I grammar
 .br
-.B lemongrass \-x
+.B lemongrass \-\-help
+.br
+.B lemongrass \-\-version
 .SH DESCRIPTION
 .B lemongrass
 reads the grammar file
@@ -131,6 +133,19 @@ before it has defined.
 Print the version of Lemon and, on a second line, the version of
 lemongrass.
 The program reads no grammar.
+.TP
+.B \-\-version
+Do the same as the option
+.BR \-x .
+.TP
+.B \-\-help
+Print the form of a call and the list of the options on standard output.
+The program reads no grammar.
+The message for an undefined option has the list of the original Lemon,
+without the options
+.B \-\-help
+and
+.BR \-\-version .
 .PP
 The program accepts the options
 .BR \-f ,

@@ -286,6 +286,7 @@ int    OptNArgs(void);
 char  *OptArg(int);
 void   OptErr(int);
 void   OptPrint(void);
+void   OptPrintTo(struct s_options*,FILE*);
 
 /******** From the file "parse.h" *****************************************/
 void Parse(struct lemon *lemp);
@@ -1786,6 +1787,23 @@ int main(int argc, char **argv){
   struct lemon lem;
   struct rule *rp;
 
+  /* The options --help and --version of lemongrass. The original has no
+  ** such options. They are not in the table above, so that the message
+  ** for an undefined option is the message of the original. */
+  for(i=1; i<argc; i++){
+    if( strcmp(argv[i],"--help")==0 ){
+      printf("Usage: %s [options] grammar\nOptions:\n", argv[0]);
+      OptPrintTo(options,stdout);
+      printf("  --help       Print this list of options.\n");
+      printf("  --version    Print the version number.\n");
+      exit(0);
+    }
+    if( strcmp(argv[i],"--version")==0 ){
+      printf("Lemon version 1.0\n");
+      printf("lemongrass version %s\n", LEMONGRASS_VERSION);
+      exit(0);
+    }
+  }
   OptInit(argv,options,stderr);
   if( version ){
      printf("Lemon version 1.0\n");
@@ -2325,6 +2343,18 @@ void OptPrint(void){
         break;
     }
   }
+}
+/* Print the list of the options "o" to the stream "out". The option
+** --help of lemongrass uses this function. It does not read the command
+** line. */
+void OptPrintTo(struct s_options *o, FILE *out){
+  struct s_options *savedOp = op;
+  FILE *savedStream = errstream;
+  op = o;
+  errstream = out;
+  OptPrint();
+  op = savedOp;
+  errstream = savedStream;
 }
 /*********************** From the file "parse.c" ****************************/
 /*

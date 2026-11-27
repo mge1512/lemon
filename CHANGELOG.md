@@ -3,8 +3,8 @@
 ## 0.1.1
 
 Released on 2026-11-27. This release adds what a package needs. The
-generator and the templates are those of 0.1.0, and they write the same
-parser files.
+generator writes the same parser files as 0.1.0, and the templates are
+unchanged.
 
 - A `Makefile` builds the program `lemongrass`, runs the tests and installs
   the program, the three templates and the manual page.
@@ -12,7 +12,14 @@ parser files.
   in which the program looks for a template.
 - The test script tests a program that is already built when the variable
   `LEMONGRASS` names it. The command `make check` uses this.
-- The option `-x` prints the version 0.1.1.
+- The new option `--help` prints the form of a call and the list of the
+  options on standard output. The exit status is 0. The original Lemon
+  has no such option and reports an undefined option.
+- The new option `--version` does the same as the option `-x`, which now
+  prints the version 0.1.1.
+- The two new options are not in the list that follows the message for an
+  undefined option. That message is the message of the original Lemon,
+  byte for byte.
 
 ## 0.1.0
 

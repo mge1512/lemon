@@ -57,8 +57,9 @@ call the program `lemongrass`, so that nobody takes it for an original
 `lemon` on the same machine. The other commands write a parser for the
 grammar `query.y`: `query.c` with `query.h`, `query.go` or `query.rs`.
 
-`./lemongrass -x` prints the version of Lemon and, on a second line, the
-version of lemongrass.
+`./lemongrass --help` prints the list of the options. `./lemongrass -x`
+prints the version of Lemon and, on a second line, the version of
+lemongrass. The option `--version` does the same.
 
 | Document | For |
 |---|---|
@@ -125,11 +126,12 @@ it skips without them. It writes only below `build/`. It has six parts:
 5. It makes parsers for grammars with the error symbol and with
    `%extra_context`. The Go and Rust compilers must refuse them with a
    message that names the feature.
-6. It checks the output of the option `-x`. The version of lemongrass must
-   be the newest one in `CHANGELOG.md`, and the manual page must name the
-   same version.
+6. It checks the output of the options `-x`, `--version` and `--help`. The
+   version of lemongrass must be the newest release in `CHANGELOG.md`, and
+   the manual page must name the same version. The manual page must also
+   have every option of the list of `--help`.
 
-The last result with gcc 13.3.0, Go 1.24.7 and rustc 1.97.0 was "63 passed,
+The last result with gcc 13.3.0, Go 1.24.7 and rustc 1.97.0 was "66 passed,
 0 failed, 0 skipped".
 
 An earlier run used the address sanitizer and the undefined behavior
