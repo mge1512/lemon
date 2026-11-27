@@ -54,6 +54,7 @@ for the grammar `query.y`: `query.c` with `query.h`, `query.go` or
 | `doc/go-and-rust.md` | People who write a grammar for Go or Rust |
 | `doc/template-syntax.md` | People who write a template for another language |
 | `doc/lemon.html` | The grammar language. This is the original documentation. |
+| `doc/upstream-notes.md` | Two things in the original files, with test cases |
 
 The generator is a build tool for input that you trust, as the original is.
 A grammar file and a template are code. Do not run the generator on files
@@ -85,6 +86,10 @@ it skips without them. It writes only below `build/`. It has five parts:
 
 The last result with gcc 13.3.0, Go 1.24.7 and rustc 1.97.0 was "60 passed,
 0 failed, 0 skipped".
+
+One more run used the address sanitizer and the undefined behavior sanitizer
+of gcc for both generators and the C test programs. It gave the same result
+and no report of a sanitizer.
 
 ## Rules of this repository
 
