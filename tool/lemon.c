@@ -296,6 +296,7 @@ void Reprint(struct lemon *);
 void ReportOutput(struct lemon *);
 void ReportTable(struct lemon *, int, int);
 void ReportHeader(struct lemon *);
+void tplt_load_syntax(struct lemon *);
 void CompressTables(struct lemon *);
 void ResortStates(struct lemon *);
 
@@ -1804,6 +1805,10 @@ int main(int argc, char **argv){
   lem.nolinenosflag = nolinenosflag;
   lem.printPreprocessed = printPP;
   Symbol_new("$");
+
+  /* Read the syntax definitions of the template, if it has any */
+  tplt_load_syntax(&lem);
+  if( lem.errorcnt ) exit(lem.errorcnt);
 
   /* Parse the input file */
   Parse(&lem);
@@ -3721,6 +3726,135 @@ PRIVATE int compute_action(struct lemon *lemp, struct action *ap)
 #define LINESIZE 10000
 /* The next cluster of routines are for reading the template file
 ** and writing the results to the generated parser */
+
+/*
+** A template can define the syntax of the text that this program inserts
+** into the parser file.  The definitions are lines of the form
+**
+**     %%syntax NAME "TEXT"
+**
+** at the very start of the template file.  aTpltSyntax[] holds the TEXT
+** for each NAME, or NULL for a NAME that the template does not define.
+** A template without %%syntax lines gets the C syntax that is built into
+** this program.
+*/
+static struct {
+  const char *zName;     /* Name of the syntax element */
+  char *zText;           /* Text from the template, or NULL */
+} aTpltSyntax[] = {
+  { "file-suffix",        0 },
+  { "line",               0 },
+  { "default-token-type", 0 },
+  { "const",              0 },
+  { "type",               0 },
+  { "token",              0 },
+  { "tokens-begin",       0 },
+  { "tokens-end",         0 },
+  { "type-uint8",         0 },
+  { "type-uint16",        0 },
+  { "type-uint32",        0 },
+  { "type-int8",          0 },
+  { "type-int16",         0 },
+  { "type-int32",         0 },
+  { "extra-argument",     0 },
+  { "no-extra-argument",  0 },
+  { "extra-context",      0 },
+  { "no-extra-context",   0 },
+  { "union-begin",        0 },
+  { "union-member",       0 },
+  { "union-end",          0 },
+  { "array-begin",        0 },
+  { "array-end",          0 },
+  { "case-first",         0 },
+  { "case-next",          0 },
+  { "case-begin",         0 },
+  { "case-end",           0 },
+  { "default-begin",      0 },
+  { "default-item",       0 },
+  { "default-end",        0 },
+  { "rhs-fetch",          0 },
+  { "lhs-decl",           0 },
+  { "lhs-fetch",          0 },
+  { "lhs-store",          0 },
+  { "major-ref",          0 },
+};
+#define N_TPLT_SYNTAX ((int)(sizeof(aTpltSyntax)/sizeof(aTpltSyntax[0])))
+static int nTpltSyntax = 0;  /* Number of %%syntax lines in the template */
+
+/* True if the template defines its own syntax */
+#define tplt_custom()  (nTpltSyntax>0)
+
+/* Return the text that the template defines for zName, or NULL. */
+PRIVATE const char *tplt_syntax(const char *zName){
+  int i;
+  for(i=0; i<N_TPLT_SYNTAX; i++){
+    if( strcmp(aTpltSyntax[i].zName,zName)==0 ) return aTpltSyntax[i].zText;
+  }
+  assert( 0 );  /* zName is always a name from aTpltSyntax[] */
+  return 0;
+}
+
+/* Read the %%syntax lines at the start of the template file "in".  Leave
+** the file at the first line that is not a %%syntax line.
+**
+** If lemp is not NULL, store the definitions and report errors.  If lemp
+** is NULL, only skip the lines.
+*/
+PRIVATE void tplt_read_syntax(struct lemon *lemp, FILE *in){
+  char line[LINESIZE];
+  long iPos = ftell(in);
+  int lineno = 0;
+  while( fgets(line,LINESIZE,in)
+      && strncmp(line,"%%syntax",8)==0 && ISSPACE(line[8]) ){
+    char *z = &line[8];
+    char *zName, *zText;
+    int i, n;
+    lineno++;
+    iPos = ftell(in);
+    if( lemp==0 ) continue;
+    while( ISSPACE(*z) ) z++;
+    zName = z;
+    while( *z && !ISSPACE(*z) ) z++;
+    if( *z ) *(z++) = 0;
+    while( ISSPACE(*z) ) z++;
+    for(i=0; i<N_TPLT_SYNTAX && strcmp(aTpltSyntax[i].zName,zName)!=0; i++){}
+    if( i>=N_TPLT_SYNTAX ){
+      ErrorMsg("template",lineno,"Unknown name in %%%%syntax: \"%s\".",zName);
+      lemp->errorcnt++;
+      continue;
+    }
+    if( *z!='"' ){
+      ErrorMsg("template",lineno,
+        "The text of %%%%syntax %s must be in double quotes.",zName);
+      lemp->errorcnt++;
+      continue;
+    }
+    zText = ++z;
+    n = 0;
+    while( *z && *z!='"' ){
+      if( *z=='\\' && z[1] ){
+        z++;
+        zText[n++] = *z=='n' ? '\n' : *z=='t' ? '\t' : *z;
+        z++;
+      }else{
+        zText[n++] = *(z++);
+      }
+    }
+    if( *z!='"' ){
+      ErrorMsg("template",lineno,
+        "The text of %%%%syntax %s has no closing double quote.",zName);
+      lemp->errorcnt++;
+      continue;
+    }
+    zText[n] = 0;
+    lemon_free(aTpltSyntax[i].zText);
+    aTpltSyntax[i].zText = (char*)lemon_malloc( n+1 );
+    lemon_strcpy(aTpltSyntax[i].zText, zText);
+    nTpltSyntax++;
+  }
+  fseek(in, iPos, SEEK_SET);
+}
+
 /* The first function transfers data from "in" to "out" until
 ** a line is seen which begins with "%%".  The line number is
 ** tracked.
@@ -3759,8 +3893,9 @@ PRIVATE void tplt_skip_header(FILE *in){
 }
 
 /* The next function finds the template file and opens it, returning
-** a pointer to the opened file. */
-PRIVATE FILE *tplt_open(struct lemon *lemp)
+** a pointer to the opened file.  If bQuiet is true and there is no
+** template file, return NULL without a message. */
+PRIVATE FILE *tplt_open(struct lemon *lemp, int bQuiet)
 {
   static char templatename[] = "lempar.c";
   char buf[1000];
@@ -3772,6 +3907,7 @@ PRIVATE FILE *tplt_open(struct lemon *lemp)
   /* first, see if user specified a template filename on the command line. */
   if (user_templatename != 0) {
     if( access(user_templatename,004)==-1 ){
+      if( bQuiet ) return 0;
       fprintf(stderr,"Can't find the parser driver template file \"%s\".\n",
         user_templatename);
       lemp->errorcnt++;
@@ -3779,6 +3915,7 @@ PRIVATE FILE *tplt_open(struct lemon *lemp)
     }
     in = fopen(user_templatename,"rb");
     if( in==0 ){
+      if( bQuiet ) return 0;
       fprintf(stderr,"Can't open the template file \"%s\".\n",
               user_templatename);
       lemp->errorcnt++;
@@ -3801,6 +3938,7 @@ PRIVATE FILE *tplt_open(struct lemon *lemp)
     toFree = tpltname = pathsearch(lemp->argv[0],templatename,0);
   }
   if( tpltname==0 ){
+    if( bQuiet ) return 0;
     fprintf(stderr,"Can't find the parser driver template file \"%s\".\n",
     templatename);
     lemp->errorcnt++;
@@ -3808,11 +3946,24 @@ PRIVATE FILE *tplt_open(struct lemon *lemp)
   }
   in = fopen(tpltname,"rb");
   if( in==0 ){
+    if( bQuiet ){ lemon_free(toFree); return 0; }
     fprintf(stderr,"Can't open the template file \"%s\".\n",tpltname);
     lemp->errorcnt++;
   }
   lemon_free(toFree);
   return in;
+}
+
+/* Read the %%syntax lines of the template.  This is done before the
+** grammar is read, because the grammar reader needs the syntax of a line
+** directive.  If there is no template, do nothing: ReportTable() reports
+** that later.
+*/
+void tplt_load_syntax(struct lemon *lemp){
+  FILE *in = tplt_open(lemp, 1);
+  if( in==0 ) return;
+  tplt_read_syntax(lemp, in);
+  fclose(in);
 }
 
 /* Print a #line directive line to the output file. */
@@ -4447,8 +4598,9 @@ void ReportTable(
   lemp->minReduce = lemp->noAction + 1;
   lemp->maxAction = lemp->minReduce + lemp->nrule;
 
-  in = tplt_open(lemp);
+  in = tplt_open(lemp, 0);
   if( in==0 ) return;
+  tplt_read_syntax(0, in);
   if( sqlFlag ){
     FILE *sql = file_open(lemp, ".sql", "wb");
     if( sql==0 ){

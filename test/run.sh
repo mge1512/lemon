@@ -70,5 +70,25 @@ for grammar in "$ROOT/upstream/src/parse.y" "$ROOT/upstream/test/lemon-test01.y"
   compare_c "$grammar" -s -S
 done
 
+# expect_error LABEL EXPECTED-TEXT TEMPLATE-LINES...
+# Puts the lines before the C template and expects that the generator stops
+# with an error message that has the expected text.
+expect_error() {
+  label=$1; expected=$2; shift 2
+  dir="$BUILD/syntax-error"; rm -rf "$dir"; mkdir -p "$dir/out"
+  { for l in "$@"; do printf "%s\n" "$l"; done; cat "$ROOT/tool/lempar.c"; } >"$dir/template"
+  ( cd "$dir" && "$BUILD/lemon" -Ttemplate -dout "$ROOT/test/grammars/calc.y" >stdout.txt 2>stderr.txt; echo $? >status.txt )
+  if [ "$(cat "$dir/status.txt")" != 0 ] && grep -q -F "$expected" "$dir/stderr.txt" && [ -z "$(ls "$dir/out")" ]; then
+    pass "syntax line refused: $label"
+  else
+    fail "syntax line not refused: $label"
+  fi
+}
+
+echo "== part 2: errors in %%syntax lines of a template"
+expect_error "unknown name"      "Unknown name"            "%%syntax nonsense \"x\""
+expect_error "text without quotes" "must be in double quotes" "%%syntax const x"
+expect_error "open quote"        "no closing double quote" "%%syntax const \"x"
+
 echo "== result: $PASSED passed, $FAILED failed"
 [ "$FAILED" -eq 0 ]
