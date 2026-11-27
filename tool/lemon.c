@@ -3752,50 +3752,53 @@ PRIVATE int compute_action(struct lemon *lemp, struct action *ap)
 **
 **     %%syntax NAME "TEXT"
 **
-** at the very start of the template file.  aTpltSyntax[] holds the TEXT
-** for each NAME, or NULL for a NAME that the template does not define.
+** at the very start of the template file.  aTpltSyntax[] has one entry
+** for each NAME: the placeholders that its TEXT can have, whether a
+** template can leave the NAME out, and the TEXT of the template, or NULL.
 ** A template without %%syntax lines gets the C syntax that is built into
 ** this program.
 */
 static struct {
   const char *zName;     /* Name of the syntax element */
+  const char *zVars;     /* Names of the placeholders, with spaces between */
+  int bOptional;         /* True if a template can leave the element out */
   char *zText;           /* Text from the template, or NULL */
 } aTpltSyntax[] = {
-  { "file-suffix",        0 },
-  { "line",               0 },
-  { "default-token-type", 0 },
-  { "const",              0 },
-  { "type",               0 },
-  { "token",              0 },
-  { "tokens-begin",       0 },
-  { "tokens-end",         0 },
-  { "type-uint8",         0 },
-  { "type-uint16",        0 },
-  { "type-uint32",        0 },
-  { "type-int8",          0 },
-  { "type-int16",         0 },
-  { "type-int32",         0 },
-  { "extra-argument",     0 },
-  { "no-extra-argument",  0 },
-  { "extra-context",      0 },
-  { "no-extra-context",   0 },
-  { "union-begin",        0 },
-  { "union-member",       0 },
-  { "union-end",          0 },
-  { "array-begin",        0 },
-  { "array-end",          0 },
-  { "case-first",         0 },
-  { "case-next",          0 },
-  { "case-begin",         0 },
-  { "case-end",           0 },
-  { "default-begin",      0 },
-  { "default-item",       0 },
-  { "default-end",        0 },
-  { "rhs-fetch",          0 },
-  { "lhs-decl",           0 },
-  { "lhs-fetch",          0 },
-  { "lhs-store",          0 },
-  { "major-ref",          0 },
+  { "file-suffix",        "",                     0, 0 },
+  { "line",               "LINE FILE",            0, 0 },
+  { "default-token-type", "",                     0, 0 },
+  { "const",              "NAME VALUE",           0, 0 },
+  { "type",               "NAME TYPE",            0, 0 },
+  { "token",              "NAME VALUE",           0, 0 },
+  { "tokens-begin",       "",                     1, 0 },
+  { "tokens-end",         "",                     1, 0 },
+  { "type-uint8",         "",                     0, 0 },
+  { "type-uint16",        "",                     0, 0 },
+  { "type-uint32",        "",                     0, 0 },
+  { "type-int8",          "",                     0, 0 },
+  { "type-int16",         "",                     0, 0 },
+  { "type-int32",         "",                     0, 0 },
+  { "extra-argument",     "NAME DECL ID",         1, 0 },
+  { "no-extra-argument",  "NAME",                 1, 0 },
+  { "extra-context",      "NAME DECL ID",         1, 0 },
+  { "no-extra-context",   "NAME",                 1, 0 },
+  { "union-begin",        "NAME",                 0, 0 },
+  { "union-member",       "TYPE N",               0, 0 },
+  { "union-end",          "",                     0, 0 },
+  { "array-begin",        "NAME TYPE COUNT",      0, 0 },
+  { "array-end",          "",                     0, 0 },
+  { "case-first",         "VALUE TEXT",           0, 0 },
+  { "case-next",          "VALUE TEXT",           0, 0 },
+  { "case-begin",         "",                     0, 0 },
+  { "case-end",           "",                     0, 0 },
+  { "default-begin",      "",                     0, 0 },
+  { "default-item",       "VALUE TEXT",           0, 0 },
+  { "default-end",        "",                     0, 0 },
+  { "rhs-fetch",          "LABEL TYPE N OFFSET",  0, 0 },
+  { "lhs-decl",           "LABEL TYPE N OFFSET",  0, 0 },
+  { "lhs-fetch",          "LABEL TYPE N OFFSET",  0, 0 },
+  { "lhs-store",          "LABEL TYPE N OFFSET",  0, 0 },
+  { "major-ref",          "OFFSET",               0, 0 },
 };
 #define N_TPLT_SYNTAX ((int)(sizeof(aTpltSyntax)/sizeof(aTpltSyntax[0])))
 static int nTpltSyntax = 0;  /* Number of %%syntax lines in the template */
@@ -3813,6 +3816,35 @@ PRIVATE const char *tplt_syntax(const char *zName){
   return 0;
 }
 
+/* If z is the start of a placeholder, $NAME or ${NAME}, return the length
+** of NAME, which has upper-case letters only.  Set *pzName to the start of
+** NAME and *pnAll to the length of the whole placeholder.  Return 0 if z
+** is not the start of a placeholder.
+*/
+PRIVATE int tplt_placeholder(const char *z, const char **pzName, int *pnAll){
+  int bBrace, n;
+  if( z[0]!='$' ) return 0;
+  bBrace = (z[1]=='{');
+  z += 1 + bBrace;
+  for(n=0; ISUPPER(z[n]); n++){}
+  if( n==0 || (bBrace && z[n]!='}') ) return 0;
+  *pzName = z;
+  *pnAll = 1 + n + 2*bBrace;
+  return n;
+}
+
+/* Return true if the n bytes at zName are one of the names in zVars */
+PRIVATE int tplt_has_var(const char *zVars, const char *zName, int n){
+  while( *zVars ){
+    int k;
+    for(k=0; zVars[k] && zVars[k]!=' '; k++){}
+    if( k==n && strncmp(zVars,zName,n)==0 ) return 1;
+    zVars += k;
+    while( *zVars==' ' ) zVars++;
+  }
+  return 0;
+}
+
 /* Read the %%syntax lines at the start of the template file "in".  Leave
 ** the file at the first line that is not a %%syntax line.
 **
@@ -3827,7 +3859,8 @@ PRIVATE void tplt_read_syntax(struct lemon *lemp, FILE *in){
       && strncmp(line,"%%syntax",8)==0 && ISSPACE(line[8]) ){
     char *z = &line[8];
     char *zName, *zText;
-    int i, n;
+    const char *zVar;
+    int i, n, nVar, nAll, nBad;
     lineno++;
     iPos = ftell(in);
     if( lemp==0 ) continue;
@@ -3839,6 +3872,12 @@ PRIVATE void tplt_read_syntax(struct lemon *lemp, FILE *in){
     for(i=0; i<N_TPLT_SYNTAX && strcmp(aTpltSyntax[i].zName,zName)!=0; i++){}
     if( i>=N_TPLT_SYNTAX ){
       ErrorMsg("template",lineno,"Unknown name in %%%%syntax: \"%s\".",zName);
+      lemp->errorcnt++;
+      continue;
+    }
+    if( aTpltSyntax[i].zText ){
+      ErrorMsg("template",lineno,
+        "The template has more than one line %%%%syntax %s.",zName);
       lemp->errorcnt++;
       continue;
     }
@@ -3866,7 +3905,23 @@ PRIVATE void tplt_read_syntax(struct lemon *lemp, FILE *in){
       continue;
     }
     zText[n] = 0;
-    lemon_free(aTpltSyntax[i].zText);
+    nBad = 0;
+    for(z=zText; *z; z++){
+      if( z[0]=='$' && z[1]=='$' ){
+        z++;
+      }else if( (nVar = tplt_placeholder(z, &zVar, &nAll))>0 ){
+        if( !tplt_has_var(aTpltSyntax[i].zVars, zVar, nVar) ){
+          ErrorMsg("template",lineno,
+            "%%%%syntax %s has no placeholder $%.*s.",zName,nVar,zVar);
+          nBad++;
+        }
+        z += nAll - 1;
+      }
+    }
+    if( nBad ){
+      lemp->errorcnt += nBad;
+      continue;
+    }
     aTpltSyntax[i].zText = (char*)lemon_malloc( n+1 );
     lemon_strcpy(aTpltSyntax[i].zText, zText);
     nTpltSyntax++;
@@ -3874,23 +3929,23 @@ PRIVATE void tplt_read_syntax(struct lemon *lemp, FILE *in){
   fseek(in, iPos, SEEK_SET);
 }
 
-static int nTpltError = 0;   /* Number of errors in the use of syntax text */
-
-/* Return the text that the template defines for zName.  If the template
-** does not define it, report an error once and return an empty text.
+/* A template with %%syntax lines must have a line for every name that is
+** not optional.  Report the names that it does not have.
 */
-PRIVATE const char *tplt_need(const char *zName){
-  static char aReported[N_TPLT_SYNTAX];
-  int i;
-  for(i=0; i<N_TPLT_SYNTAX && strcmp(aTpltSyntax[i].zName,zName)!=0; i++){}
-  assert( i<N_TPLT_SYNTAX );
-  if( aTpltSyntax[i].zText ) return aTpltSyntax[i].zText;
-  if( !aReported[i] ){
-    fprintf(stderr,"The template has no %%%%syntax line for \"%s\".\n",zName);
-    aReported[i] = 1;
-    nTpltError++;
+PRIVATE void tplt_check_syntax(struct lemon *lemp){
+  int i, n = 0;
+  if( !tplt_custom() ) return;
+  for(i=0; i<N_TPLT_SYNTAX; i++){
+    if( aTpltSyntax[i].zText || aTpltSyntax[i].bOptional ) continue;
+    fprintf(stderr, "%s \"%s\"",
+            n ? "," : "The template has no %%syntax line for",
+            aTpltSyntax[i].zName);
+    n++;
   }
-  return "";
+  if( n ){
+    fprintf(stderr, ".\n");
+    lemp->errorcnt++;
+  }
 }
 
 /* Return the text of an integer, for use as the value of a placeholder.
@@ -3908,7 +3963,9 @@ PRIVATE const char *tplt_int(int v){
 /* Expand the text zText of a %%syntax line.  The arguments in ap are pairs
 ** of a placeholder name and its value, and a NULL ends them.  In zText,
 ** $NAME and ${NAME} stand for the value of NAME, and $$ stands for one
-** dollar sign.  A placeholder name has upper-case letters only.
+** dollar sign.  tplt_read_syntax() has checked that zText has only the
+** placeholders of its syntax element, and the caller gives a value for
+** each of them.
 **
 ** The result is in memory that the next call reuses.
 */
@@ -3926,26 +3983,19 @@ PRIVATE char *tplt_vexpand(const char *zText, va_list ap){
   for(z=zText; ; z++){
     const char *zAdd = z;    /* Text to add to the result */
     int nAdd = 1;            /* Number of bytes of zAdd to add */
+    const char *zName;       /* Name of a placeholder */
+    int n, nAll, i;
     if( *z=='$' && z[1]=='$' ){
       z++;
-    }else if( *z=='$' ){
-      int bBrace = (z[1]=='{');
-      const char *zName = &z[1+bBrace];
-      int n, i;
-      for(n=0; ISUPPER(zName[n]); n++){}
-      if( n>0 && (!bBrace || zName[n]=='}') ){
-        for(i=0; i<nVar; i+=2){
-          if( lemonStrlen(azVar[i])==n && strncmp(azVar[i],zName,n)==0 ) break;
-        }
-        if( i<nVar ){
-          zAdd = azVar[i+1];
-          nAdd = lemonStrlen(zAdd);
-          z = &zName[n-1+bBrace];
-        }else{
-          fprintf(stderr,"Unknown placeholder $%.*s in the %%%%syntax text "
-                         "\"%s\".\n", n, zName, zText);
-          nTpltError++;
-        }
+    }else if( (n = tplt_placeholder(z, &zName, &nAll))>0 ){
+      for(i=0; i<nVar; i+=2){
+        if( lemonStrlen(azVar[i])==n && strncmp(azVar[i],zName,n)==0 ) break;
+      }
+      assert( i<nVar );
+      if( i<nVar ){
+        zAdd = azVar[i+1];
+        nAdd = lemonStrlen(zAdd);
+        z += nAll - 1;
       }
     }
     if( nUsed+nAdd+1 > nAlloc ){
@@ -4000,7 +4050,7 @@ PRIVATE void emit_const(
   FILE *out, int *lineno, const char *zName, const char *zC, int v
 ){
   if( tplt_custom() ){
-    tplt_emit(out, lineno, tplt_need("const"),
+    tplt_emit(out, lineno, tplt_syntax("const"),
               "NAME", zName, "VALUE", tplt_int(v), (char*)0);
   }else{
     fprintf(out, zC, v); (*lineno)++;
@@ -4020,7 +4070,7 @@ PRIVATE const char *tplt_inttype(const char *zCType){
   int i;
   if( !tplt_custom() ) return zCType;
   for(i=0; i<(int)(sizeof(aMap)/sizeof(aMap[0])); i++){
-    if( strcmp(aMap[i].zC,zCType)==0 ) return tplt_need(aMap[i].zSyntax);
+    if( strcmp(aMap[i].zC,zCType)==0 ) return tplt_syntax(aMap[i].zSyntax);
   }
   return zCType;
 }
@@ -4032,7 +4082,7 @@ PRIVATE void emit_type(
   FILE *out, int *lineno, const char *zName, const char *zC, const char *zType
 ){
   if( tplt_custom() ){
-    tplt_emit(out, lineno, tplt_need("type"),
+    tplt_emit(out, lineno, tplt_syntax("type"),
               "NAME", zName, "TYPE", zType, (char*)0);
   }else{
     fprintf(out, zC, zType); (*lineno)++;
@@ -4047,7 +4097,7 @@ PRIVATE void emit_array_begin(
   const char *zC
 ){
   if( tplt_custom() ){
-    tplt_emit(out, lineno, tplt_need("array-begin"), "NAME", zName,
+    tplt_emit(out, lineno, tplt_syntax("array-begin"), "NAME", zName,
               "TYPE", zType, "COUNT", tplt_int(nEntry), (char*)0);
   }else{
     fprintf(out, zC, zType); (*lineno)++;
@@ -4057,7 +4107,7 @@ PRIVATE void emit_array_begin(
 /* Write the end of a table */
 PRIVATE void emit_array_end(FILE *out, int *lineno){
   if( tplt_custom() ){
-    tplt_emit(out, lineno, tplt_need("array-end"), (char*)0);
+    tplt_emit(out, lineno, tplt_syntax("array-end"), (char*)0);
   }else{
     fprintf(out, "};\n"); (*lineno)++;
   }
@@ -4076,7 +4126,7 @@ PRIVATE void emit_tokens(FILE *out, struct lemon *lemp, int *lineno){
     char *zName = (char*)lemon_malloc( nPrefix+lemonStrlen(zSym)+1 );
     lemon_strcpy(zName, zPrefix);
     lemon_strcpy(&zName[nPrefix], zSym);
-    tplt_emit(out, lineno, tplt_need("token"),
+    tplt_emit(out, lineno, tplt_syntax("token"),
               "NAME", zName, "VALUE", tplt_int(i), (char*)0);
     lemon_free(zName);
   }
@@ -4210,16 +4260,17 @@ PRIVATE FILE *tplt_open(struct lemon *lemp, int bQuiet)
   return in;
 }
 
-/* Read the %%syntax lines of the template.  This is done before the
-** grammar is read, because the grammar reader needs the syntax of a line
-** directive.  If there is no template, do nothing: ReportTable() reports
-** that later.
+/* Read and check the %%syntax lines of the template.  This is done before
+** the grammar is read, because the grammar reader needs the syntax of a
+** line directive.  If there is no template, do nothing: ReportTable()
+** reports that later.
 */
 void tplt_load_syntax(struct lemon *lemp){
   FILE *in = tplt_open(lemp, 1);
   if( in==0 ) return;
   tplt_read_syntax(lemp, in);
   fclose(in);
+  tplt_check_syntax(lemp);
   if( tplt_syntax("line")!=0 && tplt_syntax("line")[0]==0 ){
     lemp->nolinenosflag = 1;
   }
@@ -4464,7 +4515,7 @@ PRIVATE int translate_code_custom(struct lemon *lemp, struct rule *rp){
             if( cp!=rp->code && cp[-1]=='@' ){
               /* @X is the token number of X, not the value of X */
               append_str("", -1, 0, 0);
-              append_text(tplt_expand(tplt_need("major-ref"),
+              append_text(tplt_expand(tplt_syntax("major-ref"),
                             "OFFSET", tplt_int(i-rp->nrhs+1), (char*)0));
               cp = xp;
             }
@@ -4523,7 +4574,7 @@ PRIVATE int translate_code_custom(struct lemon *lemp, struct rule *rp){
 
   /* The prefix: one local variable for each label */
   if( rp->lhsalias ){
-    append_text(tplt_expand(tplt_need(lhsshared ? "lhs-fetch" : "lhs-decl"),
+    append_text(tplt_expand(tplt_syntax(lhsshared ? "lhs-fetch" : "lhs-decl"),
        "LABEL", rp->lhsalias,
        "TYPE", tplt_symbol_type(lemp, rp->lhs),
        "N", tplt_int(rp->lhs->dtnum),
@@ -4533,7 +4584,7 @@ PRIVATE int translate_code_custom(struct lemon *lemp, struct rule *rp){
     struct symbol *sp = rp->rhs[i];
     if( rp->rhsalias[i]==0 ) continue;
     if( sp->type==MULTITERMINAL ) sp = sp->subsym[0];
-    append_text(tplt_expand(tplt_need("rhs-fetch"),
+    append_text(tplt_expand(tplt_syntax("rhs-fetch"),
        "LABEL", rp->rhsalias[i],
        "TYPE", tplt_symbol_type(lemp, sp),
        "N", tplt_int(sp->dtnum),
@@ -4545,7 +4596,7 @@ PRIVATE int translate_code_custom(struct lemon *lemp, struct rule *rp){
 
   /* The suffix: store the value of the LHS */
   if( rp->lhsalias ){
-    append_text(tplt_expand(tplt_need("lhs-store"),
+    append_text(tplt_expand(tplt_syntax("lhs-store"),
        "LABEL", rp->lhsalias,
        "TYPE", tplt_symbol_type(lemp, rp->lhs),
        "N", tplt_int(rp->lhs->dtnum),
@@ -4918,24 +4969,24 @@ void print_stack_union(
     char *zTokType = (char*)lemon_malloc( lemonStrlen(name)+10 );
     lemon_strcpy(zTokType, name);
     lemon_strcpy(&zTokType[lemonStrlen(name)], "TOKENTYPE");
-    tplt_emit(out, &lineno, tplt_need("type"), "NAME", zTokType,
+    tplt_emit(out, &lineno, tplt_syntax("type"), "NAME", zTokType,
               "TYPE", lemp->tokentype ? lemp->tokentype : "void*", (char*)0);
     lemon_free(zTokType);
-    tplt_emit(out, &lineno, tplt_need("union-begin"), "NAME", name, (char*)0);
+    tplt_emit(out, &lineno, tplt_syntax("union-begin"), "NAME", name, (char*)0);
     for(i=0; i<arraysize; i++){
       if( types[i]==0 ) continue;
-      tplt_emit(out, &lineno, tplt_need("union-member"),
+      tplt_emit(out, &lineno, tplt_syntax("union-member"),
                 "TYPE", types[i], "N", tplt_int(i+1), (char*)0);
       lemon_free(types[i]);
     }
     if( lemp->errsym && lemp->errsym->useCnt ){
-      tplt_emit(out, &lineno, tplt_need("union-member"),
+      tplt_emit(out, &lineno, tplt_syntax("union-member"),
                 "TYPE", tplt_inttype("int"),
                 "N", tplt_int(lemp->errsym->dtnum), (char*)0);
     }
     lemon_free(stddt);
     lemon_free(types);
-    tplt_emit(out, &lineno, tplt_need("union-end"), (char*)0);
+    tplt_emit(out, &lineno, tplt_syntax("union-end"), (char*)0);
     *plineno = lineno;
     return;
   }
@@ -5087,7 +5138,7 @@ PRIVATE const char *tplt_rule_text(struct rule *rp){
 */
 PRIVATE void emit_case(FILE *out, int *lineno, struct rule *rp, int bNext){
   if( tplt_custom() ){
-    tplt_emit(out, lineno, tplt_need(bNext ? "case-next" : "case-first"),
+    tplt_emit(out, lineno, tplt_syntax(bNext ? "case-next" : "case-first"),
               "VALUE", tplt_int(rp->iRule), "TEXT", tplt_rule_text(rp),
               (char*)0);
   }else{
@@ -5105,14 +5156,14 @@ PRIVATE void emit_case(FILE *out, int *lineno, struct rule *rp, int bNext){
 /* Write the text between the rules of a case and its action */
 PRIVATE void emit_case_begin(FILE *out, int *lineno){
   if( tplt_custom() ){
-    tplt_emit(out, lineno, tplt_need("case-begin"), (char*)0);
+    tplt_emit(out, lineno, tplt_syntax("case-begin"), (char*)0);
   }
 }
 
 /* Write the end of a case */
 PRIVATE void emit_case_end(FILE *out, int *lineno){
   if( tplt_custom() ){
-    tplt_emit(out, lineno, tplt_need("case-end"), (char*)0);
+    tplt_emit(out, lineno, tplt_syntax("case-end"), (char*)0);
   }else{
     fprintf(out,"        break;\n"); (*lineno)++;
   }
@@ -5121,7 +5172,7 @@ PRIVATE void emit_case_end(FILE *out, int *lineno){
 /* Write the start of the case for all rules that have no action */
 PRIVATE void emit_default_begin(FILE *out, int *lineno){
   if( tplt_custom() ){
-    tplt_emit(out, lineno, tplt_need("default-begin"), (char*)0);
+    tplt_emit(out, lineno, tplt_syntax("default-begin"), (char*)0);
   }else{
     fprintf(out,"      default:\n"); (*lineno)++;
   }
@@ -5130,7 +5181,7 @@ PRIVATE void emit_default_begin(FILE *out, int *lineno){
 /* Write one rule that has no action */
 PRIVATE void emit_default_item(FILE *out, int *lineno, struct rule *rp){
   if( tplt_custom() ){
-    tplt_emit(out, lineno, tplt_need("default-item"),
+    tplt_emit(out, lineno, tplt_syntax("default-item"),
               "VALUE", tplt_int(rp->iRule), "TEXT", tplt_rule_text(rp),
               (char*)0);
     return;
@@ -5151,7 +5202,7 @@ PRIVATE void emit_default_item(FILE *out, int *lineno, struct rule *rp){
 /* Write the end of the case for all rules that have no action */
 PRIVATE void emit_default_end(FILE *out, int *lineno){
   if( tplt_custom() ){
-    tplt_emit(out, lineno, tplt_need("default-end"), (char*)0);
+    tplt_emit(out, lineno, tplt_syntax("default-end"), (char*)0);
   }else{
     fprintf(out,"        break;\n"); (*lineno)++;
   }
@@ -5360,7 +5411,7 @@ void ReportTable(
   if( tplt_custom() ){
     /* A custom template gets every value as a constant.  The value is 0
     ** for a feature that the grammar does not use. */
-    tplt_emit(out, &lineno, tplt_need("const"), "NAME", "YYSTACKDEPTH",
+    tplt_emit(out, &lineno, tplt_syntax("const"), "NAME", "YYSTACKDEPTH",
               "VALUE", lemp->stacksize ? lemp->stacksize : "100", (char*)0);
     emit_extra(out, lemp, &lineno, 0, lemp->arg);
     emit_extra(out, lemp, &lineno, 1, lemp->ctx);
@@ -5910,8 +5961,6 @@ defines_done:
 
   /* Append any addition code the user desires */
   tplt_print(out,lemp,lemp->extracode,&lineno);
-
-  lemp->errorcnt += nTpltError;
 
   acttab_free(pActtab);
   fclose(in);

@@ -95,28 +95,40 @@ done
 # ---------------------------------------------------------------------------
 # Part 2
 
-# expect_error LABEL EXPECTED-TEXT TEMPLATE-LINES...
-# Puts the lines before the C template and expects that the generator stops
-# with an error message that has the expected text, and that it writes no
-# parser file. The report file (.out) can be there.
+# expect_error LABEL EXPECTED-TEXT TEMPLATE OPTIONS...
+# Runs the generator with the template on the calculator grammar, which has
+# destructors. Expects that the generator stops with an error message that
+# has the expected text, and that it writes no parser file. The report file
+# (.out) can be there.
 expect_error() {
-  label=$1; expected=$2; shift 2
-  dir="$BUILD/syntax-error"; rm -rf "$dir"; mkdir -p "$dir/out"
-  { for l in "$@"; do printf "%s\n" "$l"; done; cat "$ROOT/tool/lempar.c"; } >"$dir/template"
-  ( cd "$dir" && "$BUILD/lemon" ${EXTRA_OPTS:-} -Ttemplate -dout "$ROOT/test/grammars/calc.y" >stdout.txt 2>stderr.txt; echo $? >status.txt )
+  label=$1; expected=$2; template=$3; shift 3
+  dir="$BUILD/refused"; rm -rf "$dir"; mkdir -p "$dir/out"
+  ( cd "$dir" && "$BUILD/lemon" "$@" "-T$template" -dout "$ROOT/test/grammars/calc.y" >stdout.txt 2>stderr.txt; echo $? >status.txt )
   if [ "$(cat "$dir/status.txt")" != 0 ] && grep -q -F "$expected" "$dir/stderr.txt" && [ -z "$(ls "$dir/out" | grep -v "\.out$")" ]; then
     pass "refused: $label"
   else
-    fail "not refused: $label"
+    fail "not refused: $label (see $dir)"
   fi
 }
 
-echo "== part 2: errors in %%syntax lines of a template"
-expect_error "unknown name"        "Unknown name"             '%%syntax nonsense "x"'
-expect_error "text without quotes" "must be in double quotes" '%%syntax const x'
-expect_error "open quote"          "no closing double quote"  '%%syntax const "x'
-expect_error "destructor with a custom template" "A destructor needs" '%%syntax file-suffix ".x"'
-EXTRA_OPTS=-m expect_error "option -m with a custom template" "The option -m needs" '%%syntax file-suffix ".x"'
+# expect_line_error LABEL EXPECTED-TEXT LINES...
+# The same for a template that has the lines before the text of the C
+# template.
+expect_line_error() {
+  label=$1; expected=$2; shift 2
+  { for l in "$@"; do printf '%s\n' "$l"; done; cat "$ROOT/tool/lempar.c"; } >"$BUILD/template-with-lines"
+  expect_error "$label" "$expected" "$BUILD/template-with-lines"
+}
+
+echo "== part 2: errors in %%syntax lines, and limits of a custom template"
+expect_line_error "unknown name"        "Unknown name"             '%%syntax nonsense "x"'
+expect_line_error "text without quotes" "must be in double quotes" '%%syntax const x'
+expect_line_error "open quote"          "no closing double quote"  '%%syntax const "x'
+expect_line_error "unknown placeholder" "has no placeholder \$TYPE" '%%syntax const "$NAME $TYPE"'
+expect_line_error "name defined twice"  "more than one line"       '%%syntax file-suffix ".x"' '%%syntax file-suffix ".y"'
+expect_line_error "names left out"      'no %%syntax line for "line", "default-token-type"' '%%syntax file-suffix ".x"'
+expect_error "destructor with a custom template" "A destructor needs" "$ROOT/tool/lempar.go"
+expect_error "option -m with a custom template"  "The option -m needs" "$ROOT/tool/lempar.rs" -m
 
 # ---------------------------------------------------------------------------
 # Parts 3 and 4
