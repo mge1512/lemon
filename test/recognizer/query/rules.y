@@ -1,7 +1,7 @@
 // The rules of a query language, without actions. The parser only says
 // whether a list of tokens is a statement.
 //
-// The rules come from the specification of libaql, version 0.2.0
+// The rules come from the specification of libaql, version 0.1.0
 // (https://github.com/mge1512/aql), written in the notation of Lemon.
 // The tests put a few lines in front of these rules, one set for each
 // target language (../head-c.y, ../head-go.y, ../head-rs.y).
