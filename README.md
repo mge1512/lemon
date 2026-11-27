@@ -20,7 +20,7 @@ The first new templates are for Go and Rust.
 
 Started on 2026-11-27. This is work in progress.
 
-- [ ] Original files of SQLite 3.54.1 in `upstream/`
+- [x] Original files of SQLite 3.54.1 in `upstream/`
 - [ ] Test: C output identical to the original generator
 - [ ] Generator: syntax of the target language comes from the template
 - [ ] Template for Go
@@ -53,18 +53,19 @@ This repository is not part of SQLite, and the SQLite developers have not
 reviewed it.
 
 An AI coding agent (Claude, by Anthropic) wrote the changes in this
-repository, at the direction of the repository owner. The SQLite project
-states in its `AGENTS.md` that it takes no pull requests without prior
-agreement and public-domain paperwork, and that it does not accept code
-written by AI agents. This repository is therefore a proof of concept. It
-shows one way to make Lemon independent of the target language. It is not a
-submission to SQLite.
+repository, at the direction of the repository owner.
+
+The SQLite project states two rules in its `AGENTS.md`. It takes no pull
+requests without prior agreement and public-domain paperwork. And it does not
+accept code written by AI agents. This repository is therefore a proof of
+concept. It shows one way to make Lemon independent of the target language.
+It is not a submission to SQLite.
 
 ## License
 
-The files in `upstream/` are in the public domain. Their headers say so, and
-this repository keeps these headers unchanged.
+The files in `upstream/` come from SQLite, which is in the public domain. This
+repository keeps them unchanged, with their original header comments.
 
 The repository owner has not yet stated the terms for the files that this
-repository adds. Until that statement is here, only the files in `upstream/`
-have clear terms.
+repository adds. Until the owner adds that statement, only the files in
+`upstream/` have clear terms.
