@@ -1,5 +1,19 @@
 # Changelog of lemongrass
 
+## 0.1.1
+
+Released on 2026-11-27. This release adds what a package needs. The
+generator and the templates are those of 0.1.0, and they write the same
+parser files.
+
+- A `Makefile` builds the program `lemongrass`, runs the tests and installs
+  the program, the three templates and the manual page.
+- `doc/lemongrass.1` is the manual page. It has the options and the order
+  in which the program looks for a template.
+- The test script tests a program that is already built when the variable
+  `LEMONGRASS` names it. The command `make check` uses this.
+- The option `-x` prints the version 0.1.1.
+
 ## 0.1.0
 
 Released on 2026-11-27. This is the first release, and it is a proof of

@@ -24,7 +24,7 @@
 ** The version of lemongrass. The option -x prints it after the version of
 ** Lemon. The file CHANGELOG.md has an entry for each version.
 */
-#define LEMONGRASS_VERSION "0.1.0"
+#define LEMONGRASS_VERSION "0.1.1"
 
 #ifndef __WIN32__
 #   if defined(_WIN32) || defined(WIN32)
