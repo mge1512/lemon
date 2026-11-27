@@ -3982,6 +3982,111 @@ PRIVATE void tplt_emit(FILE *out, int *lineno, const char *zText, ...){
   }
 }
 
+/* The next functions write one piece of text into the parser file.  If the
+** template has C syntax, they write the C text zC.  If the template is a
+** custom template, they write the text of a %%syntax line.
+*/
+
+/* Write a line that only C needs */
+PRIVATE void emit_c(FILE *out, int *lineno, const char *zC){
+  if( tplt_custom() ) return;
+  fputs(zC, out); (*lineno)++;
+}
+
+/* Write the integer constant zName with the value v.  zC is the C text,
+** with one %d for the value.
+*/
+PRIVATE void emit_const(
+  FILE *out, int *lineno, const char *zName, const char *zC, int v
+){
+  if( tplt_custom() ){
+    tplt_emit(out, lineno, tplt_need("const"),
+              "NAME", zName, "VALUE", tplt_int(v), (char*)0);
+  }else{
+    fprintf(out, zC, v); (*lineno)++;
+  }
+}
+
+/* Return the name that the template has for the C integer type zCType */
+PRIVATE const char *tplt_inttype(const char *zCType){
+  static const struct { const char *zC; const char *zSyntax; } aMap[] = {
+    { "unsigned char",      "type-uint8"  },
+    { "unsigned short int", "type-uint16" },
+    { "unsigned int",       "type-uint32" },
+    { "signed char",        "type-int8"   },
+    { "short",              "type-int16"  },
+    { "int",                "type-int32"  },
+  };
+  int i;
+  if( !tplt_custom() ) return zCType;
+  for(i=0; i<(int)(sizeof(aMap)/sizeof(aMap[0])); i++){
+    if( strcmp(aMap[i].zC,zCType)==0 ) return tplt_need(aMap[i].zSyntax);
+  }
+  return zCType;
+}
+
+/* Write the name zName for the type zType.  zC is the C text, with one %s
+** for the type.
+*/
+PRIVATE void emit_type(
+  FILE *out, int *lineno, const char *zName, const char *zC, const char *zType
+){
+  if( tplt_custom() ){
+    tplt_emit(out, lineno, tplt_need("type"),
+              "NAME", zName, "TYPE", zType, (char*)0);
+  }else{
+    fprintf(out, zC, zType); (*lineno)++;
+  }
+}
+
+/* Write the token numbers for a custom template */
+PRIVATE void emit_tokens(FILE *out, struct lemon *lemp, int *lineno){
+  const char *zPrefix = lemp->tokenprefix ? lemp->tokenprefix : "";
+  int i;
+  if( tplt_syntax("tokens-begin") ){
+    tplt_emit(out, lineno, tplt_syntax("tokens-begin"), (char*)0);
+  }
+  for(i=1; i<lemp->nterminal; i++){
+    const char *zSym = lemp->symbols[i]->name;
+    int nPrefix = lemonStrlen(zPrefix);
+    char *zName = (char*)lemon_malloc( nPrefix+lemonStrlen(zSym)+1 );
+    lemon_strcpy(zName, zPrefix);
+    lemon_strcpy(&zName[nPrefix], zSym);
+    tplt_emit(out, lineno, tplt_need("token"),
+              "NAME", zName, "VALUE", tplt_int(i), (char*)0);
+    lemon_free(zName);
+  }
+  if( tplt_syntax("tokens-end") ){
+    tplt_emit(out, lineno, tplt_syntax("tokens-end"), (char*)0);
+  }
+}
+
+/* Write the extra argument (bCtx==0) or the extra context (bCtx==1) of the
+** parser for a custom template.  zDecl is the text of the grammar
+** directive, or NULL.
+*/
+PRIVATE void emit_extra(
+  FILE *out, struct lemon *lemp, int *lineno, int bCtx, const char *zDecl
+){
+  const char *zParser = lemp->name ? lemp->name : "Parse";
+  const char *zSyntax;
+  if( zDecl && zDecl[0] ){
+    int i = lemonStrlen(zDecl);
+    while( i>=1 && ISSPACE(zDecl[i-1]) ) i--;
+    while( i>=1 && (ISALNUM(zDecl[i-1]) || zDecl[i-1]=='_') ) i--;
+    zSyntax = tplt_syntax(bCtx ? "extra-context" : "extra-argument");
+    if( zSyntax ){
+      tplt_emit(out, lineno, zSyntax,
+                "NAME", zParser, "DECL", zDecl, "ID", &zDecl[i], (char*)0);
+    }
+  }else{
+    zSyntax = tplt_syntax(bCtx ? "no-extra-context" : "no-extra-argument");
+    if( zSyntax ){
+      tplt_emit(out, lineno, zSyntax, "NAME", zParser, (char*)0);
+    }
+  }
+}
+
 /* The first function transfers data from "in" to "out" until
 ** a line is seen which begins with "%%".  The line number is
 ** tracked.
@@ -4519,6 +4624,13 @@ void print_stack_union(
   unsigned hash;            /* For hashing the name of a type */
   const char *name;         /* Name of the parser */
 
+  /* A custom template can define the type of a token for a grammar that
+  ** has no %token_type */
+  if( tplt_custom() && lemp->tokentype==0
+   && tplt_syntax("default-token-type")!=0 ){
+    lemp->tokentype = (char*)tplt_syntax("default-token-type");
+  }
+
   /* Allocate and initialize types[] and allocate stddt[] */
   arraysize = lemp->nsymbol * 2;
   types = (char**)lemon_calloc( arraysize, sizeof(char*) );
@@ -4599,6 +4711,31 @@ void print_stack_union(
   /* Print out the definition of YYTOKENTYPE and YYMINORTYPE */
   name = lemp->name ? lemp->name : "Parse";
   lineno = *plineno;
+  if( tplt_custom() ){
+    char *zTokType = (char*)lemon_malloc( lemonStrlen(name)+10 );
+    lemon_strcpy(zTokType, name);
+    lemon_strcpy(&zTokType[lemonStrlen(name)], "TOKENTYPE");
+    tplt_emit(out, &lineno, tplt_need("type"), "NAME", zTokType,
+              "TYPE", lemp->tokentype ? lemp->tokentype : "void*", (char*)0);
+    lemon_free(zTokType);
+    tplt_emit(out, &lineno, tplt_need("union-begin"), "NAME", name, (char*)0);
+    for(i=0; i<arraysize; i++){
+      if( types[i]==0 ) continue;
+      tplt_emit(out, &lineno, tplt_need("union-member"),
+                "TYPE", types[i], "N", tplt_int(i+1), (char*)0);
+      lemon_free(types[i]);
+    }
+    if( lemp->errsym && lemp->errsym->useCnt ){
+      tplt_emit(out, &lineno, tplt_need("union-member"),
+                "TYPE", tplt_inttype("int"),
+                "N", tplt_int(lemp->errsym->dtnum), (char*)0);
+    }
+    lemon_free(stddt);
+    lemon_free(types);
+    tplt_emit(out, &lineno, tplt_need("union-end"), (char*)0);
+    *plineno = lineno;
+    return;
+  }
   if( mhflag ){ fprintf(out,"#if INTERFACE\n"); lineno++; }
   fprintf(out,"#define %sTOKENTYPE %s\n",name,
     lemp->tokentype?lemp->tokentype:"void*");  lineno++;
@@ -4879,29 +5016,45 @@ void ReportTable(
   /* Generate #defines for all tokens */
   if( lemp->tokenprefix ) prefix = lemp->tokenprefix;
   else                    prefix = "";
-  if( mhflag ){
-    fprintf(out,"#if INTERFACE\n"); lineno++;
+  if( tplt_custom() ){
+    emit_tokens(out, lemp, &lineno);
   }else{
-    fprintf(out,"#ifndef %s%s\n", prefix, lemp->symbols[1]->name); lineno++;
+    if( mhflag ){
+      fprintf(out,"#if INTERFACE\n"); lineno++;
+    }else{
+      fprintf(out,"#ifndef %s%s\n", prefix, lemp->symbols[1]->name); lineno++;
+    }
+    for(i=1; i<lemp->nterminal; i++){
+      fprintf(out,"#define %s%-30s %2d\n",prefix,lemp->symbols[i]->name,i);
+      lineno++;
+    }
+    fprintf(out,"#endif\n"); lineno++;
   }
-  for(i=1; i<lemp->nterminal; i++){
-    fprintf(out,"#define %s%-30s %2d\n",prefix,lemp->symbols[i]->name,i);
-    lineno++;
-  }
-  fprintf(out,"#endif\n"); lineno++;
   tplt_xfer(lemp->name,in,out,&lineno);
 
   /* Generate the defines */
-  fprintf(out,"#define YYCODETYPE %s\n",
-    minimum_size_type(0, lemp->nsymbol, &szCodeType)); lineno++;
-  fprintf(out,"#define YYNOCODE %d\n",lemp->nsymbol);  lineno++;
-  fprintf(out,"#define YYACTIONTYPE %s\n",
-    minimum_size_type(0,lemp->maxAction,&szActionType)); lineno++;
-  if( lemp->wildcard ){
-    fprintf(out,"#define YYWILDCARD %d\n",
-       lemp->wildcard->index); lineno++;
+  emit_type(out, &lineno, "YYCODETYPE", "#define YYCODETYPE %s\n",
+    tplt_inttype(minimum_size_type(0, lemp->nsymbol, &szCodeType)));
+  emit_const(out, &lineno, "YYNOCODE", "#define YYNOCODE %d\n", lemp->nsymbol);
+  emit_type(out, &lineno, "YYACTIONTYPE", "#define YYACTIONTYPE %s\n",
+    tplt_inttype(minimum_size_type(0,lemp->maxAction,&szActionType)));
+  if( lemp->wildcard || tplt_custom() ){
+    emit_const(out, &lineno, "YYWILDCARD", "#define YYWILDCARD %d\n",
+       lemp->wildcard ? lemp->wildcard->index : 0);
   }
   print_stack_union(out,lemp,&lineno,mhflag);
+  if( tplt_custom() ){
+    /* A custom template gets every value as a constant.  The value is 0
+    ** for a feature that the grammar does not use. */
+    tplt_emit(out, &lineno, tplt_need("const"), "NAME", "YYSTACKDEPTH",
+              "VALUE", lemp->stacksize ? lemp->stacksize : "100", (char*)0);
+    emit_extra(out, lemp, &lineno, 0, lemp->arg);
+    emit_extra(out, lemp, &lineno, 1, lemp->ctx);
+    emit_const(out, &lineno, "YYERRORSYMBOL", 0,
+       (lemp->errsym && lemp->errsym->useCnt) ? lemp->errsym->index : 0);
+    emit_const(out, &lineno, "YYFALLBACK", 0, lemp->has_fallback ? 1 : 0);
+    goto defines_done;
+  }
   fprintf(out, "#ifndef YYSTACKDEPTH\n"); lineno++;
   if( lemp->stacksize ){
     fprintf(out,"#define YYSTACKDEPTH %s\n",lemp->stacksize);  lineno++;
@@ -4986,6 +5139,7 @@ void ReportTable(
   if( lemp->has_fallback ){
     fprintf(out,"#define YYFALLBACK 1\n");  lineno++;
   }
+defines_done:
 
   /* Compute the action table, but do not output it yet.  The action
   ** table must be computed before generating the YYNSTATE macro because
@@ -5065,22 +5219,33 @@ void ReportTable(
 
   /* Finish rendering the constants now that the action table has
   ** been computed */
-  fprintf(out,"#define YYNSTATE             %d\n",lemp->nxstate);  lineno++;
-  fprintf(out,"#define YYNRULE              %d\n",lemp->nrule);  lineno++;
-  fprintf(out,"#define YYNRULE_WITH_ACTION  %d\n",lemp->nruleWithAction);
-         lineno++;
-  fprintf(out,"#define YYNTOKEN             %d\n",lemp->nterminal); lineno++;
-  fprintf(out,"#define YY_MAX_SHIFT         %d\n",lemp->nxstate-1); lineno++;
+  emit_const(out, &lineno, "YYNSTATE",
+             "#define YYNSTATE             %d\n", lemp->nxstate);
+  emit_const(out, &lineno, "YYNRULE",
+             "#define YYNRULE              %d\n", lemp->nrule);
+  emit_const(out, &lineno, "YYNRULE_WITH_ACTION",
+             "#define YYNRULE_WITH_ACTION  %d\n", lemp->nruleWithAction);
+  emit_const(out, &lineno, "YYNTOKEN",
+             "#define YYNTOKEN             %d\n", lemp->nterminal);
+  emit_const(out, &lineno, "YY_MAX_SHIFT",
+             "#define YY_MAX_SHIFT         %d\n", lemp->nxstate-1);
   i = lemp->minShiftReduce;
-  fprintf(out,"#define YY_MIN_SHIFTREDUCE   %d\n",i); lineno++;
+  emit_const(out, &lineno, "YY_MIN_SHIFTREDUCE",
+             "#define YY_MIN_SHIFTREDUCE   %d\n", i);
   i += lemp->nrule;
-  fprintf(out,"#define YY_MAX_SHIFTREDUCE   %d\n", i-1); lineno++;
-  fprintf(out,"#define YY_ERROR_ACTION      %d\n", lemp->errAction); lineno++;
-  fprintf(out,"#define YY_ACCEPT_ACTION     %d\n", lemp->accAction); lineno++;
-  fprintf(out,"#define YY_NO_ACTION         %d\n", lemp->noAction); lineno++;
-  fprintf(out,"#define YY_MIN_REDUCE        %d\n", lemp->minReduce); lineno++;
+  emit_const(out, &lineno, "YY_MAX_SHIFTREDUCE",
+             "#define YY_MAX_SHIFTREDUCE   %d\n", i-1);
+  emit_const(out, &lineno, "YY_ERROR_ACTION",
+             "#define YY_ERROR_ACTION      %d\n", lemp->errAction);
+  emit_const(out, &lineno, "YY_ACCEPT_ACTION",
+             "#define YY_ACCEPT_ACTION     %d\n", lemp->accAction);
+  emit_const(out, &lineno, "YY_NO_ACTION",
+             "#define YY_NO_ACTION         %d\n", lemp->noAction);
+  emit_const(out, &lineno, "YY_MIN_REDUCE",
+             "#define YY_MIN_REDUCE        %d\n", lemp->minReduce);
   i = lemp->minReduce + lemp->nrule;
-  fprintf(out,"#define YY_MAX_REDUCE        %d\n", i-1); lineno++;
+  emit_const(out, &lineno, "YY_MAX_REDUCE",
+             "#define YY_MAX_REDUCE        %d\n", i-1);
 
   /* Minimum and maximum token values that have a destructor */
   mn = mx = 0;
@@ -5094,8 +5259,10 @@ void ReportTable(
   }
   if( lemp->tokendest ) mn = 0;
   if( lemp->vardest ) mx = lemp->nsymbol-1;
-  fprintf(out,"#define YY_MIN_DSTRCTR       %d\n", mn);  lineno++;
-  fprintf(out,"#define YY_MAX_DSTRCTR       %d\n", mx);  lineno++;    
+  emit_const(out, &lineno, "YY_MIN_DSTRCTR",
+             "#define YY_MIN_DSTRCTR       %d\n", mn);
+  emit_const(out, &lineno, "YY_MAX_DSTRCTR",
+             "#define YY_MAX_DSTRCTR       %d\n", mx);
 
   tplt_xfer(lemp->name,in,out,&lineno);
 
@@ -5114,7 +5281,8 @@ void ReportTable(
   /* Output the yy_action table */
   lemp->nactiontab = n = acttab_action_size(pActtab);
   lemp->tablesize += n*szActionType;
-  fprintf(out,"#define YY_ACTTAB_COUNT (%d)\n", n); lineno++;
+  emit_const(out, &lineno, "YY_ACTTAB_COUNT",
+             "#define YY_ACTTAB_COUNT (%d)\n", n);
   fprintf(out,"static const YYACTIONTYPE yy_action[] = {\n"); lineno++;
   for(i=j=0; i<n; i++){
     int action = acttab_yyaction(pActtab, i);
@@ -5167,9 +5335,12 @@ void ReportTable(
   /* Output the yy_shift_ofst[] table */
   n = lemp->nxstate;
   while( n>0 && lemp->sorted[n-1]->iTknOfst==NO_OFFSET ) n--;
-  fprintf(out, "#define YY_SHIFT_COUNT    (%d)\n", n-1); lineno++;
-  fprintf(out, "#define YY_SHIFT_MIN      (%d)\n", mnTknOfst); lineno++;
-  fprintf(out, "#define YY_SHIFT_MAX      (%d)\n", mxTknOfst); lineno++;
+  emit_const(out, &lineno, "YY_SHIFT_COUNT",
+             "#define YY_SHIFT_COUNT    (%d)\n", n-1);
+  emit_const(out, &lineno, "YY_SHIFT_MIN",
+             "#define YY_SHIFT_MIN      (%d)\n", mnTknOfst);
+  emit_const(out, &lineno, "YY_SHIFT_MAX",
+             "#define YY_SHIFT_MAX      (%d)\n", mxTknOfst);
   fprintf(out, "static const %s yy_shift_ofst[] = {\n",
        minimum_size_type(mnTknOfst, lemp->nterminal+lemp->nactiontab, &sz));
        lineno++;
@@ -5193,9 +5364,12 @@ void ReportTable(
   /* Output the yy_reduce_ofst[] table */
   n = lemp->nxstate;
   while( n>0 && lemp->sorted[n-1]->iNtOfst==NO_OFFSET ) n--;
-  fprintf(out, "#define YY_REDUCE_COUNT (%d)\n", n-1); lineno++;
-  fprintf(out, "#define YY_REDUCE_MIN   (%d)\n", mnNtOfst); lineno++;
-  fprintf(out, "#define YY_REDUCE_MAX   (%d)\n", mxNtOfst); lineno++;
+  emit_const(out, &lineno, "YY_REDUCE_COUNT",
+             "#define YY_REDUCE_COUNT (%d)\n", n-1);
+  emit_const(out, &lineno, "YY_REDUCE_MIN",
+             "#define YY_REDUCE_MIN   (%d)\n", mnNtOfst);
+  emit_const(out, &lineno, "YY_REDUCE_MAX",
+             "#define YY_REDUCE_MAX   (%d)\n", mxNtOfst);
   fprintf(out, "static const %s yy_reduce_ofst[] = {\n",
           minimum_size_type(mnNtOfst-1, mxNtOfst, &sz)); lineno++;
   lemp->tablesize += n*sz;
