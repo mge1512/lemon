@@ -1,4 +1,4 @@
-# lemon
+# lemongrass
 
 The Lemon parser generator, with templates for more than one target language.
 
