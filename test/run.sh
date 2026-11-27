@@ -23,7 +23,8 @@
 #         compiler must name the feature.
 # Part 6  The version. The option -x prints the line of the original
 #         generator first and then the version of lemongrass. That version
-#         must be the newest one in CHANGELOG.md.
+#         must be the newest one in CHANGELOG.md, and the manual page
+#         doc/lemongrass.1 must name the same version.
 #
 # The script needs a C compiler (CC, default cc) and standard shell tools.
 # Parts 3 to 5 use a Go compiler (GO, default go) and a Rust compiler
@@ -342,6 +343,12 @@ if [ -n "$want" ] && [ "$got" = "$want" ]; then
   pass "the option -x prints the version $want, the newest in CHANGELOG.md"
 else
   fail "the option -x prints the version '$got', CHANGELOG.md has '$want'"
+fi
+page=$(sed -n 's/^\.TH LEMONGRASS 1 [0-9-]* "lemongrass \([0-9][0-9.]*\)".*$/\1/p' "$ROOT/doc/lemongrass.1")
+if [ -n "$want" ] && [ "$page" = "$want" ]; then
+  pass "the manual page names the version $want"
+else
+  fail "the manual page names the version '$page', CHANGELOG.md has '$want'"
 fi
 
 echo "== result: $PASSED passed, $FAILED failed, $SKIPPED skipped"

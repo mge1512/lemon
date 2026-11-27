@@ -1,0 +1,292 @@
+.\" Manual page of lemongrass.
+.\" This file is in the public domain.
+.TH LEMONGRASS 1 2026-11-27 "lemongrass 0.1.0" "User Commands"
+.SH NAME
+lemongrass \- LALR(1) parser generator with templates for C, Go and Rust
+.SH SYNOPSIS
+.B lemongrass
+.RI [ option ...]
+.I grammar
+.br
+.B lemongrass \-x
+.SH DESCRIPTION
+.B lemongrass
+reads the grammar file
+.I grammar
+and writes a parser for it.
+The program is the Lemon parser generator of the SQLite project with one
+change: a template file defines the syntax of the target language.
+There are templates for C, Go and Rust.
+With the C template the program writes the same files as the Lemon of
+SQLite 3.54.1, byte for byte.
+.PP
+The grammar file is a Lemon grammar.
+Its code blocks and its actions are in the target language.
+A grammar file with code is therefore for one language.
+.PP
+A call names exactly one grammar file.
+The program writes the parser file into the directory of the grammar file.
+The parser file has the name of the grammar file with a new suffix.
+The template gives the suffix:
+.B .c
+for C,
+.B .go
+for Go and
+.B .rs
+for Rust.
+With the C template the program also writes a header file with the suffix
+.BR .h .
+The header file has the numbers of the tokens.
+A parser in Go or Rust has these numbers as constants in the parser file.
+.PP
+The program also writes a report with the suffix
+.BR .out .
+The report lists the states of the parser and marks each conflict of the
+grammar.
+.PP
+The program is a build tool for input that you trust.
+A grammar file and a template are code.
+Do not run the program on files from a source that you do not know.
+.SH OPTIONS
+An option and its argument are one word.
+Write
+.BR \-Tlempar.go ,
+not
+.BR "\-T lempar.go" .
+.TP
+.B \-b
+Print only the basis of each state in the report.
+.TP
+.BI \-d directory
+Write all output files into
+.IR directory ,
+which must exist.
+.TP
+.BI \-D name
+Define the macro
+.IR name .
+The lines
+.BR %ifdef ,
+.B %ifndef
+and
+.B %if
+of a grammar file keep or remove a part of the grammar.
+They depend on the macros.
+.TP
+.B \-E
+Print the grammar file after the program has applied the lines
+.BR %ifdef ,
+.B %ifndef
+and
+.BR %if .
+The program writes no parser.
+.TP
+.B \-g
+Print the rules of the grammar without their actions.
+The rules that have an action come first.
+The program writes no parser.
+.TP
+.B \-l
+Write no line directives into the parser file.
+Without this option a parser in C has
+.B #line
+directives and a parser in Go has
+.B //line
+directives.
+They give the lines of the grammar file.
+A parser in Rust never has line directives.
+.TP
+.B \-m
+Write a parser file for the program
+.BR makeheaders .
+This option needs the C template.
+.TP
+.B \-p
+Show in the report also the conflicts that the precedence rules resolved.
+.TP
+.B \-q
+Write no report.
+.TP
+.B \-s
+Print statistics of the parser on standard output.
+.TP
+.B \-S
+Write also a file with the suffix
+.BR .sql .
+It has SQL statements that describe the tables of the parser.
+.TP
+.BI \-T file
+Use
+.I file
+as the template.
+.TP
+.BI \-U name
+Remove the macro
+.IR name ,
+which an option
+.B \-D
+before it has defined.
+.TP
+.B \-x
+Print the version of Lemon and, on a second line, the version of
+lemongrass.
+The program reads no grammar.
+.PP
+The program accepts the options
+.BR \-f ,
+.BR \-I ,
+.B \-O
+and
+.B \-W
+with any argument and ignores them.
+.SH TEMPLATES
+A template is the frame of the parser file.
+The program copies it and puts the tables and the actions of the grammar
+into it.
+A template for a language other than C starts with
+.B %%syntax
+lines.
+These lines give the syntax of the language and the suffix of the parser
+file.
+.PP
+With the option
+.B \-T
+the program uses the file of that option.
+Without the option it looks for a template in this order:
+.IP 1. 4
+A file with the name of the grammar file and the suffix
+.B .lt
+in place of the suffix of the grammar file.
+For the grammar
+.B query.y
+this is
+.BR query.lt .
+.IP 2. 4
+The file
+.B lempar.c
+in the current directory.
+.IP 3. 4
+The file
+.B lempar.c
+in the directory of the program, when the command names the program with
+a directory.
+When the command has no directory, the program looks in the directories
+of the variable
+.BR PATH .
+.PP
+Steps 2 and 3 look only for the file name
+.BR lempar.c ,
+and they do not look into the directory of the installed templates.
+A call of the installed program therefore names the template with the
+option
+.BR \-T .
+The options
+.B \-E
+and
+.B \-g
+need no template.
+.PP
+A template with
+.B %%syntax
+lines has limits.
+Destructors, the directives
+.BR %realloc ,
+.B %free
+and
+.BR %stack_size_limit ,
+and the option
+.B \-m
+work only with the C template.
+The templates for Go and Rust also have no error symbol and no
+.B %extra_context
+directive.
+.SH FILES
+The command
+.B make install
+of the source puts the templates into the directory
+.B share/lemongrass
+below its prefix.
+A package usually has them in these places:
+.TP
+.I /usr/share/lemongrass/lempar.c
+The template for C.
+It is the original template of Lemon.
+.TP
+.I /usr/share/lemongrass/lempar.go
+The template for Go.
+.TP
+.I /usr/share/lemongrass/lempar.rs
+The template for Rust.
+.SH EXIT STATUS
+.TP
+.B 0
+The program found no error, and the grammar has no conflict.
+.TP
+.B 1
+The program found an error, or the grammar has a conflict.
+With a conflict the program still writes the parser file and the report.
+.SH EXAMPLES
+Write the C parser
+.BR query.c ,
+the header file
+.B query.h
+and the report
+.BR query.out :
+.PP
+.RS 4
+.nf
+lemongrass \-T/usr/share/lemongrass/lempar.c query.y
+.fi
+.RE
+.PP
+Write the Go parser
+.B gen/query.go
+without line directives, and write no report:
+.PP
+.RS 4
+.nf
+lemongrass \-q \-l \-dgen \-T/usr/share/lemongrass/lempar.go query.y
+.fi
+.RE
+.PP
+Print the rules of a grammar in a sorted list:
+.PP
+.RS 4
+.nf
+lemongrass \-g query.y | grep \(aq::=\(aq | sort
+.fi
+.RE
+.PP
+Print the versions:
+.PP
+.RS 4
+.nf
+lemongrass \-x
+.fi
+.RE
+.SH SEE ALSO
+The source of lemongrass has these documents:
+.TP
+.I lemon.html
+The grammar language.
+This is the original documentation of Lemon.
+It does not describe the templates for Go and Rust.
+.TP
+.I go-and-rust.md
+A guide for people who write a grammar for Go or Rust.
+.TP
+.I template-syntax.md
+A guide for people who write a template for another language.
+.PP
+The source is at https://github.com/mge1512/lemongrass
+.SH AUTHORS
+Richard Hipp wrote the original Lemon, which is part of SQLite.
+.PP
+lemongrass belongs to Matthias G. Eckermann.
+An AI coding agent (Claude, by Anthropic) wrote the changes to Lemon and
+the templates for Go and Rust, at his direction.
+.PP
+lemongrass is not part of SQLite, and the SQLite developers have not
+reviewed it.
+.SH COPYRIGHT
+lemongrass is in the public domain, as the original Lemon is.

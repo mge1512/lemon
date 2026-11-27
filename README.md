@@ -62,6 +62,7 @@ version of lemongrass.
 
 | Document | For |
 |---|---|
+| `doc/lemongrass.1` | People who call the program. This is the manual page. |
 | `doc/go-and-rust.md` | People who write a grammar for Go or Rust |
 | `doc/template-syntax.md` | People who write a template for another language |
 | `doc/lemon.html` | The grammar language. This is the original documentation. |
@@ -77,10 +78,11 @@ from a source that you do not know.
     make check
     make install PREFIX=/usr DESTDIR=/tmp/stage
 
-`make install` puts the program into `$(PREFIX)/bin` and the three
-templates into `$(PREFIX)/share/lemongrass`. The default of `PREFIX` is
-`/usr/local`. `DESTDIR` is for the build of a package, and it is empty by
-default. The head of the `Makefile` lists all variables.
+`make install` puts the program into `$(PREFIX)/bin`, the three templates
+into `$(PREFIX)/share/lemongrass` and the manual page into
+`$(PREFIX)/share/man/man1`. The default of `PREFIX` is `/usr/local`.
+`DESTDIR` is for the build of a package, and it is empty by default. The
+head of the `Makefile` lists all variables.
 
 The installed program does not know the directory of the templates. Name
 the template with the option `-T`:
@@ -91,6 +93,10 @@ Without the option `-T` the program uses the C template. It looks for a
 file `lempar.c` in the current directory. Then it looks in the directory
 of the program, or in the directories of `PATH` when the command has no
 directory.
+
+The manual page has the options and the full order of that search. The
+command `man -l doc/lemongrass.1` shows it from the source, or
+`man lemongrass` after the install.
 
 ## Test
 
@@ -120,9 +126,10 @@ it skips without them. It writes only below `build/`. It has six parts:
    `%extra_context`. The Go and Rust compilers must refuse them with a
    message that names the feature.
 6. It checks the output of the option `-x`. The version of lemongrass must
-   be the newest one in `CHANGELOG.md`.
+   be the newest one in `CHANGELOG.md`, and the manual page must name the
+   same version.
 
-The last result with gcc 13.3.0, Go 1.24.7 and rustc 1.97.0 was "62 passed,
+The last result with gcc 13.3.0, Go 1.24.7 and rustc 1.97.0 was "63 passed,
 0 failed, 0 skipped".
 
 An earlier run used the address sanitizer and the undefined behavior

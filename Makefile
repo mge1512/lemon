@@ -2,12 +2,13 @@
 #
 #   make             builds the program lemongrass
 #   make check       runs the tests with that program
-#   make install     installs the program and the templates
+#   make install     installs the program, the templates and the manual page
 #   make uninstall   removes the installed files
 #   make clean       removes the program and the directory build/
 #
 # Variables for the build:    CC, CPPFLAGS, CFLAGS, LDFLAGS
-# Variables for the install:  PREFIX, BINDIR, DATADIR, DESTDIR, INSTALL
+# Variables for the install:  PREFIX, BINDIR, DATADIR, MANDIR, DESTDIR,
+#                             INSTALL
 #
 # Example for a package:
 #   make CFLAGS="$RPM_OPT_FLAGS"
@@ -18,6 +19,7 @@ CFLAGS  ?= -O2
 PREFIX  ?= /usr/local
 BINDIR  ?= $(PREFIX)/bin
 DATADIR ?= $(PREFIX)/share
+MANDIR  ?= $(DATADIR)/man
 INSTALL ?= install
 
 # The directory of the templates.
@@ -37,11 +39,14 @@ check: lemongrass
 
 install: lemongrass
 	$(INSTALL) -d "$(DESTDIR)$(BINDIR)" "$(DESTDIR)$(TEMPLATEDIR)"
+	$(INSTALL) -d "$(DESTDIR)$(MANDIR)/man1"
 	$(INSTALL) -m 755 lemongrass "$(DESTDIR)$(BINDIR)/lemongrass"
 	$(INSTALL) -m 644 $(TEMPLATES) "$(DESTDIR)$(TEMPLATEDIR)/"
+	$(INSTALL) -m 644 doc/lemongrass.1 "$(DESTDIR)$(MANDIR)/man1/lemongrass.1"
 
 uninstall:
 	rm -f "$(DESTDIR)$(BINDIR)/lemongrass"
+	rm -f "$(DESTDIR)$(MANDIR)/man1/lemongrass.1"
 	rm -f "$(DESTDIR)$(TEMPLATEDIR)/lempar.c"
 	rm -f "$(DESTDIR)$(TEMPLATEDIR)/lempar.go"
 	rm -f "$(DESTDIR)$(TEMPLATEDIR)/lempar.rs"
