@@ -46,15 +46,16 @@ What is not there:
 
 ## Use
 
-    cc -O2 -o lemongrass tool/lemon.c
+    make
     ./lemongrass -Ttool/lempar.c  query.y
     ./lemongrass -Ttool/lempar.go query.y
     ./lemongrass -Ttool/lempar.rs query.y
 
-The first command builds the generator. The examples call the program
-`lemongrass`, so that nobody takes it for an original `lemon` on the same
-machine. The other commands write a parser for the grammar `query.y`:
-`query.c` with `query.h`, `query.go` or `query.rs`.
+The first command builds the generator. The generator is one C file, and
+`cc -O2 -o lemongrass tool/lemon.c` builds it without `make`. The examples
+call the program `lemongrass`, so that nobody takes it for an original
+`lemon` on the same machine. The other commands write a parser for the
+grammar `query.y`: `query.c` with `query.h`, `query.go` or `query.rs`.
 
 `./lemongrass -x` prints the version of Lemon and, on a second line, the
 version of lemongrass.
@@ -70,9 +71,34 @@ The generator is a build tool for input that you trust, as the original is.
 A grammar file and a template are code. Do not run the generator on files
 from a source that you do not know.
 
+## Install
+
+    make
+    make check
+    make install PREFIX=/usr DESTDIR=/tmp/stage
+
+`make install` puts the program into `$(PREFIX)/bin` and the three
+templates into `$(PREFIX)/share/lemongrass`. The default of `PREFIX` is
+`/usr/local`. `DESTDIR` is for the build of a package, and it is empty by
+default. The head of the `Makefile` lists all variables.
+
+The installed program does not know the directory of the templates. Name
+the template with the option `-T`:
+
+    lemongrass -T/usr/share/lemongrass/lempar.go query.y
+
+Without the option `-T` the program uses the C template. It looks for a
+file `lempar.c` in the current directory. Then it looks in the directory
+of the program, or in the directories of `PATH` when the command has no
+directory.
+
 ## Test
 
     sh test/run.sh
+    make check
+
+The first command builds the changed generator and tests it. The second
+command runs the same script with the program that `make` built.
 
 The script needs a C compiler and standard shell tools. It uses a Go
 compiler and a Rust compiler when they are there, and it says which tests
@@ -123,6 +149,7 @@ that run passed, and no sanitizer gave a report.
 | `tool/lempar.go`, `tool/lempar.rs` | The new templates |
 | `doc/` | The documents of the table above |
 | `test/` | The test script, the grammars and the test programs |
+| `Makefile` | The commands to build, test and install |
 | `CHANGELOG.md` | The releases and what they changed |
 | `LICENSE.md` | The terms: public domain |
 

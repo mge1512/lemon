@@ -30,6 +30,10 @@
 # (RUSTC, default rustc) when they are there. Without one of them, the
 # script skips the tests for that language and says so.
 #
+# The script builds the changed generator itself. When the variable
+# LEMONGRASS names a program, the script tests that program instead, for
+# example the one that "make" built: LEMONGRASS=./lemongrass sh test/run.sh
+#
 # The script writes only below the directory build/.
 
 set -u
@@ -53,7 +57,12 @@ mkdir -p "$BUILD"
 
 echo "== build the generators"
 "$CC" -O1 -o "$BUILD/lemon-orig" "$ROOT/upstream/tool/lemon.c" || { echo "cannot build the original generator"; exit 2; }
-"$CC" -O1 -o "$BUILD/lemon"      "$ROOT/tool/lemon.c"          || { echo "cannot build the changed generator"; exit 2; }
+if [ -n "${LEMONGRASS:-}" ]; then
+  echo "== the changed generator is the program $LEMONGRASS"
+  cp "$LEMONGRASS" "$BUILD/lemon" || { echo "cannot copy the program $LEMONGRASS"; exit 2; }
+else
+  "$CC" -O1 -o "$BUILD/lemon" "$ROOT/tool/lemon.c" || { echo "cannot build the changed generator"; exit 2; }
+fi
 
 # ---------------------------------------------------------------------------
 # Part 1
