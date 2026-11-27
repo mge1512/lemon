@@ -5363,7 +5363,9 @@ void ReportTable(
       i = -1;
     }
   }
-  if( lemp->include[0]=='/' ){
+  if( lemp->include[0]=='/' && !tplt_custom() ){
+    /* This is a rule for C.  A custom template always gets its header,
+    ** which can have text that the target language needs. */
     tplt_skip_header(in);
   }else{
     tplt_xfer(lemp->name,in,out,&lineno);

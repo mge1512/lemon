@@ -41,9 +41,8 @@
 ** Rules for a grammar that uses this template:
 **
 **   *  The parser file is one module.  Use it with "mod".  The code of
-**      %include is at the start of the module.  It must not start with a
-**      comment, because the generator then leaves out the lines up to the
-**      mark below, with the allow attribute.
+**      %include is at the start of the module, after the allow attributes
+**      below.
 **   *  %token_type and the types of %type are Rust types.
 **   *  %extra_argument has a type only, for example {State}.  The parser
 **      owns a value of this type.  The code of the grammar reaches it under
