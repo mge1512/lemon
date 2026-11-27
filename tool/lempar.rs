@@ -32,10 +32,23 @@
 %%syntax lhs-store "    yypParser.yystack[(yysp+($OFFSET)) as usize].minor = YYMINORTYPE::yy$N($LABEL);\n"
 %%syntax major-ref "(yypParser.yystack[(yysp+($OFFSET)) as usize].major as i32)"
 /*
+** 2000-05-29
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
 ** Driver template for the LEMON parser generator, for the Rust language.
 **
 ** This file is a translation of the C driver template lempar.c of SQLite
-** 3.54.1.  The lines that start with "%%syntax" tell the generator how to
+** 3.54.1, made on 2026-11-27.  The notice above is the notice of that file,
+** and this translation is in the public domain as well.
+**
+** The lines that start with "%%syntax" tell the generator how to
 ** write constants, types, tables, cases and the code around an action in
 ** Rust.  The generator does not copy these lines.
 **
