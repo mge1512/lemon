@@ -4380,6 +4380,183 @@ PRIVATE char *append_str(const char *zText, int n, int p1, int p2){
   return z;
 }
 
+/* Return the text of the datatype of symbol sp, without spaces around it.
+** The result is in memory that the next call reuses.
+*/
+PRIVATE const char *tplt_symbol_type(struct lemon *lemp, struct symbol *sp){
+  static char *z = 0;
+  static int nAlloc = 0;
+  const char *zType;
+  int n;
+  if( sp->type==MULTITERMINAL ) sp = sp->subsym[0];
+  if( sp->dtnum==0 ){
+    zType = lemp->tokentype ? lemp->tokentype : "void*";
+  }else if( sp->datatype ){
+    zType = sp->datatype;
+  }else if( lemp->vartype ){
+    zType = lemp->vartype;
+  }else{
+    zType = tplt_inttype("int");   /* The error symbol */
+  }
+  while( ISSPACE(*zType) ) zType++;
+  n = lemonStrlen(zType);
+  while( n>0 && ISSPACE(zType[n-1]) ) n--;
+  if( n+1>nAlloc ){
+    nAlloc = n + 100;
+    z = (char*)lemon_realloc(z, nAlloc);
+  }
+  memcpy(z, zType, n);
+  z[n] = 0;
+  return z;
+}
+
+/* Add text to the string that append_str() builds.  Unlike append_str(),
+** this function never changes a "%d" in the text.
+*/
+PRIVATE void append_text(const char *zText){
+  for(; *zText; zText++) append_str(zText, 1, 0, 0);
+}
+
+/*
+** Do the work of translate_code() for a custom template.
+**
+** The code of the rule stays as it is, except that @X becomes the text of
+** "major-ref".  Every label of the rule becomes a local variable:
+** rp->codePrefix declares the variables and gives the labels of the right
+** side their values from the parser stack.  rp->codeSuffix puts the value
+** of the left side on the stack.
+*/
+PRIVATE int translate_code_custom(struct lemon *lemp, struct rule *rp){
+  char *cp, *xp;
+  int i;
+  char lhsused = 0;      /* True if the LHS element has been used */
+  char lhsshared = 0;    /* True if LHS and left-most RHS share a label */
+  char used[MAXRHS];     /* True for each RHS element which is used */
+
+  for(i=0; i<rp->nrhs; i++) used[i] = 0;
+  if( rp->lhsalias && rp->nrhs>0 && rp->rhsalias[0]
+   && strcmp(rp->lhsalias,rp->rhsalias[0])==0 ){
+    lhsshared = 1;
+    lhsused = 1;
+    used[0] = 1;
+    if( rp->lhs->dtnum!=rp->rhs[0]->dtnum ){
+      ErrorMsg(lemp->filename,rp->ruleline,
+        "%s(%s) and %s(%s) share the same label but have "
+        "different datatypes.",
+        rp->lhs->name, rp->lhsalias, rp->rhs[0]->name, rp->rhsalias[0]);
+      lemp->errorcnt++;
+    }
+  }
+
+  /* Copy the code.  Find the labels that it uses.  Replace @X. */
+  append_str(0,0,0,0);
+  for(cp=(char *)rp->code; *cp; cp++){
+    if( ISALPHA(*cp) && (cp==rp->code || (!ISALNUM(cp[-1]) && cp[-1]!='_')) ){
+      char saved;
+      for(xp= &cp[1]; ISALNUM(*xp) || *xp=='_'; xp++);
+      saved = *xp;
+      *xp = 0;
+      if( rp->lhsalias && strcmp(cp,rp->lhsalias)==0 ){
+        lhsused = 1;
+      }else{
+        for(i=0; i<rp->nrhs; i++){
+          if( rp->rhsalias[i] && strcmp(cp,rp->rhsalias[i])==0 ){
+            if( cp!=rp->code && cp[-1]=='@' ){
+              /* @X is the token number of X, not the value of X */
+              append_str("", -1, 0, 0);
+              append_text(tplt_expand(tplt_need("major-ref"),
+                            "OFFSET", tplt_int(i-rp->nrhs+1), (char*)0));
+              cp = xp;
+            }
+            used[i] = 1;
+            break;
+          }
+        }
+      }
+      *xp = saved;
+    }
+    append_str(cp, 1, 0, 0);
+  }
+  cp = append_str(0,0,0,0);
+  if( cp && cp[0] ) rp->code = Strsafe(cp);
+  append_str(0,0,0,0);
+
+  /* Check to make sure the LHS has been used */
+  if( rp->lhsalias && !lhsused ){
+    ErrorMsg(lemp->filename,rp->ruleline,
+      "Label \"%s\" for \"%s(%s)\" is never used.",
+        rp->lhsalias,rp->lhs->name,rp->lhsalias);
+    lemp->errorcnt++;
+  }
+
+  /* Generate error messages for unused labels and duplicate labels */
+  for(i=0; i<rp->nrhs; i++){
+    int j;
+    if( rp->rhsalias[i]==0 ) continue;
+    if( i>0 && rp->lhsalias && strcmp(rp->lhsalias,rp->rhsalias[i])==0 ){
+      ErrorMsg(lemp->filename,rp->ruleline,
+        "%s(%s) has the same label as the LHS but is not the left-most "
+        "symbol on the RHS.",
+        rp->rhs[i]->name, rp->rhsalias[i]);
+      lemp->errorcnt++;
+    }
+    for(j=0; j<i; j++){
+      if( rp->rhsalias[j] && strcmp(rp->rhsalias[j],rp->rhsalias[i])==0 ){
+        ErrorMsg(lemp->filename,rp->ruleline,
+          "Label %s used for multiple symbols on the RHS of a rule.",
+          rp->rhsalias[i]);
+        lemp->errorcnt++;
+        break;
+      }
+    }
+    if( !used[i] ){
+      ErrorMsg(lemp->filename,rp->ruleline,
+        "Label %s for \"%s(%s)\" is never used.",
+        rp->rhsalias[i],rp->rhs[i]->name,rp->rhsalias[i]);
+      lemp->errorcnt++;
+    }
+  }
+
+  /* A rule without code needs no variables: the value of the left-most
+  ** RHS symbol stays where it is and becomes the value of the LHS. */
+  if( rp->noCode ) return 0;
+
+  /* The prefix: one local variable for each label */
+  if( rp->lhsalias ){
+    append_text(tplt_expand(tplt_need(lhsshared ? "lhs-fetch" : "lhs-decl"),
+       "LABEL", rp->lhsalias,
+       "TYPE", tplt_symbol_type(lemp, rp->lhs),
+       "N", tplt_int(rp->lhs->dtnum),
+       "OFFSET", tplt_int(1-rp->nrhs), (char*)0));
+  }
+  for(i=lhsshared; i<rp->nrhs; i++){
+    struct symbol *sp = rp->rhs[i];
+    if( rp->rhsalias[i]==0 ) continue;
+    if( sp->type==MULTITERMINAL ) sp = sp->subsym[0];
+    append_text(tplt_expand(tplt_need("rhs-fetch"),
+       "LABEL", rp->rhsalias[i],
+       "TYPE", tplt_symbol_type(lemp, sp),
+       "N", tplt_int(sp->dtnum),
+       "OFFSET", tplt_int(i-rp->nrhs+1), (char*)0));
+  }
+  cp = append_str(0,0,0,0);
+  if( cp && cp[0] ) rp->codePrefix = Strsafe(cp);
+  append_str(0,0,0,0);
+
+  /* The suffix: store the value of the LHS */
+  if( rp->lhsalias ){
+    append_text(tplt_expand(tplt_need("lhs-store"),
+       "LABEL", rp->lhsalias,
+       "TYPE", tplt_symbol_type(lemp, rp->lhs),
+       "N", tplt_int(rp->lhs->dtnum),
+       "OFFSET", tplt_int(1-rp->nrhs), (char*)0));
+  }
+  cp = append_str(0,0,0,0);
+  if( cp && cp[0] ) rp->codeSuffix = Strsafe(cp);
+
+  return 0;
+}
+
 /*
 ** Write and transform the rp->code string so that symbols are expanded.
 ** Populate the rp->codePrefix and rp->codeSuffix strings, as appropriate.
@@ -4410,6 +4587,8 @@ PRIVATE int translate_code(struct lemon *lemp, struct rule *rp){
   }else{
     rp->noCode = 0;
   }
+
+  if( tplt_custom() ) return translate_code_custom(lemp, rp);
 
 
   if( rp->nrhs==0 ){
