@@ -297,6 +297,8 @@ void ReportOutput(struct lemon *);
 void ReportTable(struct lemon *, int, int);
 void ReportHeader(struct lemon *);
 void tplt_load_syntax(struct lemon *);
+const char *tplt_syntax(const char *);
+char *tplt_expand(const char *, ...);
 void CompressTables(struct lemon *);
 void ResortStates(struct lemon *);
 
@@ -2760,6 +2762,7 @@ static void parseonetoken(struct pstate *psp)
         int nOld, n, nLine = 0, nNew, nBack;
         int addLineMacro;
         char zLine[50];
+        const char *zCustomLine = 0;  /* Line directive in template syntax */
         zNew = x;
         if( zNew[0]=='"' || zNew[0]=='{' ) zNew++;
         nNew = lemonStrlen(zNew);
@@ -2774,6 +2777,15 @@ static void parseonetoken(struct pstate *psp)
                        && psp->insertLineMacro
                        && psp->tokenlineno>1
                        && (psp->decllinenoslot==0 || psp->decllinenoslot[0]!=0);
+        if( addLineMacro && tplt_syntax("line")!=0 ){
+          /* The template defines the syntax of a line directive */
+          lemon_sprintf(zLine, "%d", psp->tokenlineno);
+          zCustomLine = tplt_expand(tplt_syntax("line"), "LINE", zLine,
+                                    "FILE", psp->filename, (char*)0);
+          nLine = lemonStrlen(zCustomLine);
+          n += nLine;
+          addLineMacro = 0;
+        }
         if( addLineMacro ){
           for(z=psp->filename, nBack=0; *z; z++){
             if( *z=='\\' ) nBack++;
@@ -2784,6 +2796,13 @@ static void parseonetoken(struct pstate *psp)
         }
         *psp->declargslot = (char *) lemon_realloc(*psp->declargslot, n);
         zBuf = *psp->declargslot + nOld;
+        if( zCustomLine ){
+          if( nOld && zBuf[-1]!='\n' ){
+            *(zBuf++) = '\n';
+          }
+          memcpy(zBuf, zCustomLine, nLine);
+          zBuf += nLine;
+        }
         if( addLineMacro ){
           if( nOld && zBuf[-1]!='\n' ){
             *(zBuf++) = '\n';
@@ -3855,6 +3874,114 @@ PRIVATE void tplt_read_syntax(struct lemon *lemp, FILE *in){
   fseek(in, iPos, SEEK_SET);
 }
 
+static int nTpltError = 0;   /* Number of errors in the use of syntax text */
+
+/* Return the text that the template defines for zName.  If the template
+** does not define it, report an error once and return an empty text.
+*/
+PRIVATE const char *tplt_need(const char *zName){
+  static char aReported[N_TPLT_SYNTAX];
+  int i;
+  for(i=0; i<N_TPLT_SYNTAX && strcmp(aTpltSyntax[i].zName,zName)!=0; i++){}
+  assert( i<N_TPLT_SYNTAX );
+  if( aTpltSyntax[i].zText ) return aTpltSyntax[i].zText;
+  if( !aReported[i] ){
+    fprintf(stderr,"The template has no %%%%syntax line for \"%s\".\n",zName);
+    aReported[i] = 1;
+    nTpltError++;
+  }
+  return "";
+}
+
+/* Return the text of an integer, for use as the value of a placeholder.
+** The text stays valid for the next three calls.
+*/
+PRIVATE const char *tplt_int(int v){
+  static char aBuf[4][30];
+  static int iNext = 0;
+  char *z = aBuf[iNext];
+  iNext = (iNext+1)%4;
+  lemon_sprintf(z, "%d", v);
+  return z;
+}
+
+/* Expand the text zText of a %%syntax line.  The arguments in ap are pairs
+** of a placeholder name and its value, and a NULL ends them.  In zText,
+** $NAME and ${NAME} stand for the value of NAME, and $$ stands for one
+** dollar sign.  A placeholder name has upper-case letters only.
+**
+** The result is in memory that the next call reuses.
+*/
+PRIVATE char *tplt_vexpand(const char *zText, va_list ap){
+  static char *zBuf = 0;
+  static int nAlloc = 0;
+  const char *azVar[20];
+  int nVar = 0;
+  int nUsed = 0;
+  const char *z;
+  while( nVar<18 && (azVar[nVar] = va_arg(ap,const char*))!=0 ){
+    azVar[nVar+1] = va_arg(ap,const char*);
+    nVar += 2;
+  }
+  for(z=zText; ; z++){
+    const char *zAdd = z;    /* Text to add to the result */
+    int nAdd = 1;            /* Number of bytes of zAdd to add */
+    if( *z=='$' && z[1]=='$' ){
+      z++;
+    }else if( *z=='$' ){
+      int bBrace = (z[1]=='{');
+      const char *zName = &z[1+bBrace];
+      int n, i;
+      for(n=0; ISUPPER(zName[n]); n++){}
+      if( n>0 && (!bBrace || zName[n]=='}') ){
+        for(i=0; i<nVar; i+=2){
+          if( lemonStrlen(azVar[i])==n && strncmp(azVar[i],zName,n)==0 ) break;
+        }
+        if( i<nVar ){
+          zAdd = azVar[i+1];
+          nAdd = lemonStrlen(zAdd);
+          z = &zName[n-1+bBrace];
+        }else{
+          fprintf(stderr,"Unknown placeholder $%.*s in the %%%%syntax text "
+                         "\"%s\".\n", n, zName, zText);
+          nTpltError++;
+        }
+      }
+    }
+    if( nUsed+nAdd+1 > nAlloc ){
+      nAlloc = (nUsed+nAdd)*2 + 100;
+      zBuf = (char*)lemon_realloc(zBuf, nAlloc);
+    }
+    memcpy(&zBuf[nUsed], zAdd, nAdd);
+    nUsed += nAdd;
+    if( *z==0 ) break;
+  }
+  return zBuf;
+}
+char *tplt_expand(const char *zText, ...){
+  va_list ap;
+  char *z;
+  va_start(ap, zText);
+  z = tplt_vexpand(zText, ap);
+  va_end(ap);
+  return z;
+}
+
+/* Expand the text zText of a %%syntax line, as tplt_expand() does, and
+** write the result to "out".  If lineno is not NULL, count the lines.
+*/
+PRIVATE void tplt_emit(FILE *out, int *lineno, const char *zText, ...){
+  va_list ap;
+  char *z;
+  va_start(ap, zText);
+  z = tplt_vexpand(zText, ap);
+  va_end(ap);
+  for(; *z; z++){
+    if( *z=='\n' && lineno ) (*lineno)++;
+    putc(*z, out);
+  }
+}
+
 /* The first function transfers data from "in" to "out" until
 ** a line is seen which begins with "%%".  The line number is
 ** tracked.
@@ -3964,11 +4091,21 @@ void tplt_load_syntax(struct lemon *lemp){
   if( in==0 ) return;
   tplt_read_syntax(lemp, in);
   fclose(in);
+  if( tplt_syntax("line")!=0 && tplt_syntax("line")[0]==0 ){
+    lemp->nolinenosflag = 1;
+  }
 }
 
 /* Print a #line directive line to the output file. */
 PRIVATE void tplt_linedir(FILE *out, int lineno, char *filename)
 {
+  const char *zLine = tplt_syntax("line");
+  if( zLine ){
+    tplt_emit(out, 0, zLine, "LINE", tplt_int(lineno), "FILE", filename,
+              (char*)0);
+    fflush(out);
+    return;
+  }
   fprintf(out,"#line %d \"",lineno);
   while( *filename ){
     if( *filename == '\\' ) putc('\\',out);
@@ -4601,6 +4738,27 @@ void ReportTable(
   in = tplt_open(lemp, 0);
   if( in==0 ) return;
   tplt_read_syntax(0, in);
+  if( tplt_custom() ){
+    /* The first version of template-defined syntax has two limits */
+    int nLimit = 0;
+    int bDestructor = lemp->tokendest!=0 || lemp->vardest!=0;
+    for(i=0; i<lemp->nsymbol && !bDestructor; i++){
+      if( lemp->symbols[i]->destructor ) bDestructor = 1;
+    }
+    if( mhflag ){
+      fprintf(stderr,"The option -m needs a template with C syntax.\n");
+      nLimit++;
+    }
+    if( bDestructor ){
+      fprintf(stderr,"A destructor needs a template with C syntax.\n");
+      nLimit++;
+    }
+    if( nLimit ){
+      lemp->errorcnt += nLimit;
+      fclose(in);
+      return;
+    }
+  }
   if( sqlFlag ){
     FILE *sql = file_open(lemp, ".sql", "wb");
     if( sql==0 ){
@@ -4671,7 +4829,8 @@ void ReportTable(
     fprintf(sql, "COMMIT;\n");
     fclose(sql);
   }
-  out = file_open(lemp,".c","wb");
+  out = file_open(lemp, tplt_syntax("file-suffix") ? tplt_syntax("file-suffix")
+                                                 : ".c", "wb");
   if( out==0 ){
     fclose(in);
     return;
@@ -5271,6 +5430,8 @@ void ReportTable(
   /* Append any addition code the user desires */
   tplt_print(out,lemp,lemp->extracode,&lineno);
 
+  lemp->errorcnt += nTpltError;
+
   acttab_free(pActtab);
   fclose(in);
   fclose(out);
@@ -5286,6 +5447,7 @@ void ReportHeader(struct lemon *lemp)
   char pattern[LINESIZE];
   int i;
 
+  if( tplt_custom() ) return;  /* The tokens are in the parser file */
   if( lemp->tokenprefix ) prefix = lemp->tokenprefix;
   else                    prefix = "";
   in = file_open(lemp,".h","rb");
