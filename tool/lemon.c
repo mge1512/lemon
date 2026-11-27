@@ -5241,7 +5241,7 @@ void ReportTable(
   if( in==0 ) return;
   tplt_read_syntax(0, in);
   if( tplt_custom() ){
-    /* The first version of template-defined syntax has two limits */
+    /* The first version of template-defined syntax has three limits */
     int nLimit = 0;
     int bDestructor = lemp->tokendest!=0 || lemp->vardest!=0;
     for(i=0; i<lemp->nsymbol && !bDestructor; i++){
@@ -5253,6 +5253,11 @@ void ReportTable(
     }
     if( bDestructor ){
       fprintf(stderr,"A destructor needs a template with C syntax.\n");
+      nLimit++;
+    }
+    if( lemp->reallocFunc || lemp->freeFunc || lemp->stackSizeLimit ){
+      fprintf(stderr,"%%realloc, %%free and %%stack_size_limit need a "
+                     "template with C syntax.\n");
       nLimit++;
     }
     if( nLimit ){

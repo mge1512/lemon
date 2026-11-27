@@ -96,14 +96,14 @@ done
 # Part 2
 
 # expect_error LABEL EXPECTED-TEXT TEMPLATE OPTIONS...
-# Runs the generator with the template on the calculator grammar, which has
-# destructors. Expects that the generator stops with an error message that
-# has the expected text, and that it writes no parser file. The report file
-# (.out) can be there.
+# Runs the generator with the template on the grammar $GRAMMAR. Expects that
+# the generator stops with an error message that has the expected text, and
+# that it writes no parser file. The report file (.out) can be there.
+GRAMMAR="$ROOT/test/grammars/calc.y"
 expect_error() {
   label=$1; expected=$2; template=$3; shift 3
   dir="$BUILD/refused"; rm -rf "$dir"; mkdir -p "$dir/out"
-  ( cd "$dir" && "$BUILD/lemon" "$@" "-T$template" -dout "$ROOT/test/grammars/calc.y" >stdout.txt 2>stderr.txt; echo $? >status.txt )
+  ( cd "$dir" && "$BUILD/lemon" "$@" "-T$template" -dout "$GRAMMAR" >stdout.txt 2>stderr.txt; echo $? >status.txt )
   if [ "$(cat "$dir/status.txt")" != 0 ] && grep -q -F "$expected" "$dir/stderr.txt" && [ -z "$(ls "$dir/out" | grep -v "\.out$")" ]; then
     pass "refused: $label"
   else
@@ -129,6 +129,8 @@ expect_line_error "name defined twice"  "more than one line"       '%%syntax fil
 expect_line_error "names left out"      'no %%syntax line for "line", "default-token-type"' '%%syntax file-suffix ".x"'
 expect_error "destructor with a custom template" "A destructor needs" "$ROOT/tool/lempar.go"
 expect_error "option -m with a custom template"  "The option -m needs" "$ROOT/tool/lempar.rs" -m
+GRAMMAR="$ROOT/upstream/src/parse.y"
+expect_error "%realloc with a custom template"   "%realloc, %free and %stack_size_limit need" "$ROOT/tool/lempar.go"
 
 # ---------------------------------------------------------------------------
 # Parts 3 and 4
