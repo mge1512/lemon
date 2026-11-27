@@ -21,6 +21,9 @@
 # Part 5  The limits of the Go and Rust templates. A grammar that uses a
 #         feature without support must not compile, and the message of the
 #         compiler must name the feature.
+# Part 6  The version. The option -x prints the line of the original
+#         generator first and then the version of lemongrass. That version
+#         must be the newest one in CHANGELOG.md.
 #
 # The script needs a C compiler (CC, default cc) and standard shell tools.
 # Parts 3 to 5 use a Go compiler (GO, default go) and a Rust compiler
@@ -310,6 +313,26 @@ if have "$RUSTC"; then
     "%extra_context {i32}" ""
 else
   skip "limits of the Rust template: no $RUSTC command"
+fi
+
+# ---------------------------------------------------------------------------
+# Part 6
+
+echo "== part 6: the version"
+"$BUILD/lemon-orig" -x >"$BUILD/version-orig.txt" 2>&1
+"$BUILD/lemon"      -x >"$BUILD/version.txt" 2>&1
+if [ -s "$BUILD/version-orig.txt" ] &&
+   [ "$(sed -n 1p "$BUILD/version.txt")" = "$(cat "$BUILD/version-orig.txt")" ]; then
+  pass "the option -x prints the line of the original generator first"
+else
+  fail "the option -x does not start with the line of the original generator"
+fi
+want=$(sed -n 's/^## \([0-9][0-9.]*\)$/\1/p' "$ROOT/CHANGELOG.md" | sed -n 1p)
+got=$(sed -n 's/^lemongrass version //p' "$BUILD/version.txt")
+if [ -n "$want" ] && [ "$got" = "$want" ]; then
+  pass "the option -x prints the version $want, the newest in CHANGELOG.md"
+else
+  fail "the option -x prints the version '$got', CHANGELOG.md has '$want'"
 fi
 
 echo "== result: $PASSED passed, $FAILED failed, $SKIPPED skipped"

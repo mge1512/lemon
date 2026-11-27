@@ -20,6 +20,11 @@
 #define ISUPPER(X) isupper((unsigned char)(X))
 #define ISLOWER(X) islower((unsigned char)(X))
 
+/*
+** The version of lemongrass. The option -x prints it after the version of
+** Lemon. The file CHANGELOG.md has an entry for each version.
+*/
+#define LEMONGRASS_VERSION "0.1.0"
 
 #ifndef __WIN32__
 #   if defined(_WIN32) || defined(WIN32)
@@ -1784,6 +1789,7 @@ int main(int argc, char **argv){
   OptInit(argv,options,stderr);
   if( version ){
      printf("Lemon version 1.0\n");
+     printf("lemongrass version %s\n", LEMONGRASS_VERSION);
      exit(0);
   }
   if( OptNArgs()!=1 ){

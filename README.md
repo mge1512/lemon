@@ -56,6 +56,9 @@ The first command builds the generator. The examples call the program
 machine. The other commands write a parser for the grammar `query.y`:
 `query.c` with `query.h`, `query.go` or `query.rs`.
 
+`./lemongrass -x` prints the version of Lemon and, on a second line, the
+version of lemongrass.
+
 | Document | For |
 |---|---|
 | `doc/go-and-rust.md` | People who write a grammar for Go or Rust |
@@ -73,7 +76,7 @@ from a source that you do not know.
 
 The script needs a C compiler and standard shell tools. It uses a Go
 compiler and a Rust compiler when they are there, and it says which tests
-it skips without them. It writes only below `build/`. It has five parts:
+it skips without them. It writes only below `build/`. It has six parts:
 
 1. It builds the original generator and the changed generator. It runs both
    on four grammars with eight sets of options. It compares all output
@@ -90,13 +93,15 @@ it skips without them. It writes only below `build/`. It has five parts:
 5. It makes parsers for grammars with the error symbol and with
    `%extra_context`. The Go and Rust compilers must refuse them with a
    message that names the feature.
+6. It checks the output of the option `-x`. The version of lemongrass must
+   be the newest one in `CHANGELOG.md`.
 
-The last result with gcc 13.3.0, Go 1.24.7 and rustc 1.97.0 was "60 passed,
+The last result with gcc 13.3.0, Go 1.24.7 and rustc 1.97.0 was "62 passed,
 0 failed, 0 skipped".
 
-One more run used the address sanitizer and the undefined behavior sanitizer
-of gcc for both generators and the C test programs. It gave the same result
-and no report of a sanitizer.
+An earlier run used the address sanitizer and the undefined behavior
+sanitizer of gcc for both generators and the C test programs. All tests of
+that run passed, and no sanitizer gave a report.
 
 ## Rules of this repository
 

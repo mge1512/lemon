@@ -17,4 +17,6 @@ concept.
 - A template with `%%syntax` lines has limits: no destructors, no `%realloc`,
   no `%free`, no `%stack_size_limit` and no option `-m`. The templates for Go
   and Rust also have no error symbol and no `%extra_context`.
+- The option `-x` prints the version of Lemon and, on a second line, the
+  version of lemongrass.
 - `doc/upstream-notes.md` describes two findings in the original files.
