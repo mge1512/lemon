@@ -4039,6 +4039,30 @@ PRIVATE void emit_type(
   }
 }
 
+/* Write the start of the table zName, which has nEntry entries of the type
+** zType.  zC is the C text.  It can have one %s for the type.
+*/
+PRIVATE void emit_array_begin(
+  FILE *out, int *lineno, const char *zName, const char *zType, int nEntry,
+  const char *zC
+){
+  if( tplt_custom() ){
+    tplt_emit(out, lineno, tplt_need("array-begin"), "NAME", zName,
+              "TYPE", zType, "COUNT", tplt_int(nEntry), (char*)0);
+  }else{
+    fprintf(out, zC, zType); (*lineno)++;
+  }
+}
+
+/* Write the end of a table */
+PRIVATE void emit_array_end(FILE *out, int *lineno){
+  if( tplt_custom() ){
+    tplt_emit(out, lineno, tplt_need("array-end"), (char*)0);
+  }else{
+    fprintf(out, "};\n"); (*lineno)++;
+  }
+}
+
 /* Write the token numbers for a custom template */
 PRIVATE void emit_tokens(FILE *out, struct lemon *lemp, int *lineno){
   const char *zPrefix = lemp->tokenprefix ? lemp->tokenprefix : "";
@@ -5283,7 +5307,8 @@ defines_done:
   lemp->tablesize += n*szActionType;
   emit_const(out, &lineno, "YY_ACTTAB_COUNT",
              "#define YY_ACTTAB_COUNT (%d)\n", n);
-  fprintf(out,"static const YYACTIONTYPE yy_action[] = {\n"); lineno++;
+  emit_array_begin(out, &lineno, "yy_action", "YYACTIONTYPE", n,
+                   "static const YYACTIONTYPE yy_action[] = {\n");
   for(i=j=0; i<n; i++){
     int action = acttab_yyaction(pActtab, i);
     if( action<0 ) action = lemp->noAction;
@@ -5296,12 +5321,14 @@ defines_done:
       j++;
     }
   }
-  fprintf(out, "};\n"); lineno++;
+  emit_array_end(out, &lineno);
 
   /* Output the yy_lookahead table */
   lemp->nlookaheadtab = n = acttab_lookahead_size(pActtab);
   lemp->tablesize += n*szCodeType;
-  fprintf(out,"static const YYCODETYPE yy_lookahead[] = {\n"); lineno++;
+  i = lemp->nterminal + lemp->nactiontab;
+  emit_array_begin(out, &lineno, "yy_lookahead", "YYCODETYPE", n>i ? n : i,
+                   "static const YYCODETYPE yy_lookahead[] = {\n");
   for(i=j=0; i<n; i++){
     int la = acttab_yylookahead(pActtab, i);
     if( la<0 ) la = lemp->nsymbol;
@@ -5330,7 +5357,7 @@ defines_done:
     i++;
   }
   if( j>0 ){ fprintf(out, "\n"); lineno++; }
-  fprintf(out, "};\n"); lineno++;
+  emit_array_end(out, &lineno);
 
   /* Output the yy_shift_ofst[] table */
   n = lemp->nxstate;
@@ -5341,9 +5368,10 @@ defines_done:
              "#define YY_SHIFT_MIN      (%d)\n", mnTknOfst);
   emit_const(out, &lineno, "YY_SHIFT_MAX",
              "#define YY_SHIFT_MAX      (%d)\n", mxTknOfst);
-  fprintf(out, "static const %s yy_shift_ofst[] = {\n",
-       minimum_size_type(mnTknOfst, lemp->nterminal+lemp->nactiontab, &sz));
-       lineno++;
+  emit_array_begin(out, &lineno, "yy_shift_ofst",
+       tplt_inttype(minimum_size_type(mnTknOfst,
+                          lemp->nterminal+lemp->nactiontab, &sz)),
+       n, "static const %s yy_shift_ofst[] = {\n");
   lemp->tablesize += n*sz;
   for(i=j=0; i<n; i++){
     int ofst;
@@ -5359,7 +5387,7 @@ defines_done:
       j++;
     }
   }
-  fprintf(out, "};\n"); lineno++;
+  emit_array_end(out, &lineno);
 
   /* Output the yy_reduce_ofst[] table */
   n = lemp->nxstate;
@@ -5370,8 +5398,9 @@ defines_done:
              "#define YY_REDUCE_MIN   (%d)\n", mnNtOfst);
   emit_const(out, &lineno, "YY_REDUCE_MAX",
              "#define YY_REDUCE_MAX   (%d)\n", mxNtOfst);
-  fprintf(out, "static const %s yy_reduce_ofst[] = {\n",
-          minimum_size_type(mnNtOfst-1, mxNtOfst, &sz)); lineno++;
+  emit_array_begin(out, &lineno, "yy_reduce_ofst",
+       tplt_inttype(minimum_size_type(mnNtOfst-1, mxNtOfst, &sz)),
+       n, "static const %s yy_reduce_ofst[] = {\n");
   lemp->tablesize += n*sz;
   for(i=j=0; i<n; i++){
     int ofst;
@@ -5387,10 +5416,11 @@ defines_done:
       j++;
     }
   }
-  fprintf(out, "};\n"); lineno++;
+  emit_array_end(out, &lineno);
 
   /* Output the default action table */
-  fprintf(out, "static const YYACTIONTYPE yy_default[] = {\n"); lineno++;
+  emit_array_begin(out, &lineno, "yy_default", "YYACTIONTYPE", lemp->nxstate,
+                   "static const YYACTIONTYPE yy_default[] = {\n");
   n = lemp->nxstate;
   lemp->tablesize += n*szActionType;
   for(i=j=0; i<n; i++){
@@ -5408,7 +5438,7 @@ defines_done:
       j++;
     }
   }
-  fprintf(out, "};\n"); lineno++;
+  emit_array_end(out, &lineno);
   tplt_xfer(lemp->name,in,out,&lineno);
 
   /* Generate the table of fallback tokens.
