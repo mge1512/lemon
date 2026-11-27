@@ -72,13 +72,14 @@ done
 
 # expect_error LABEL EXPECTED-TEXT TEMPLATE-LINES...
 # Puts the lines before the C template and expects that the generator stops
-# with an error message that has the expected text.
+# with an error message that has the expected text, and that it writes no
+# parser file. The report file (.out) can be there.
 expect_error() {
   label=$1; expected=$2; shift 2
   dir="$BUILD/syntax-error"; rm -rf "$dir"; mkdir -p "$dir/out"
   { for l in "$@"; do printf "%s\n" "$l"; done; cat "$ROOT/tool/lempar.c"; } >"$dir/template"
   ( cd "$dir" && "$BUILD/lemon" ${EXTRA_OPTS:-} -Ttemplate -dout "$ROOT/test/grammars/calc.y" >stdout.txt 2>stderr.txt; echo $? >status.txt )
-  if [ "$(cat "$dir/status.txt")" != 0 ] && grep -q -F "$expected" "$dir/stderr.txt" && [ -z "$(ls "$dir/out")" ]; then
+  if [ "$(cat "$dir/status.txt")" != 0 ] && grep -q -F "$expected" "$dir/stderr.txt" && [ -z "$(ls "$dir/out" | grep -v "\.out$")" ]; then
     pass "syntax line refused: $label"
   else
     fail "syntax line not refused: $label"
