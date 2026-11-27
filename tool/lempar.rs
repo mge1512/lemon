@@ -25,9 +25,9 @@
 %%syntax default-begin "        _ => {\n"
 %%syntax default-item "            /* ($VALUE) $TEXT */\n"
 %%syntax default-end "        }\n"
-%%syntax rhs-fetch "    let $LABEL = match std::mem::replace(&mut yypParser.yystack[(yysp+($OFFSET)) as usize].minor, YYMINORTYPE::yyinit) { YYMINORTYPE::yy$N(v) => v, _ => unreachable!() };\n"
+%%syntax rhs-fetch "    let $LABEL = match std::mem::replace(&mut yypParser.yystack[(yysp+($OFFSET)) as usize].minor, YYMINORTYPE::yyinit) { YYMINORTYPE::yy$N(v) => v, _ => panic!(\"the parser stack has no value for the label $LABEL\") };\n"
 %%syntax lhs-decl "    let $LABEL: $TYPE;\n"
-%%syntax lhs-fetch "    let mut $LABEL = match std::mem::replace(&mut yypParser.yystack[(yysp+($OFFSET)) as usize].minor, YYMINORTYPE::yyinit) { YYMINORTYPE::yy$N(v) => v, _ => unreachable!() };\n"
+%%syntax lhs-fetch "    let mut $LABEL = match std::mem::replace(&mut yypParser.yystack[(yysp+($OFFSET)) as usize].minor, YYMINORTYPE::yyinit) { YYMINORTYPE::yy$N(v) => v, _ => panic!(\"the parser stack has no value for the label $LABEL\") };\n"
 %%syntax lhs-store "    yypParser.yystack[(yysp+($OFFSET)) as usize].minor = YYMINORTYPE::yy$N($LABEL);\n"
 %%syntax major-ref "(yypParser.yystack[(yysp+($OFFSET)) as usize].major as i32)"
 /*
@@ -51,12 +51,20 @@
 **   *  The code blocks of the grammar must not have a lifetime such as 'a,
 **      because the generator reads the apostrophe as the start of a
 **      character.
+**   *  The code of an action is copied without change.  Each label of the
+**      rule is a local variable there.  The variable owns the value: the
+**      parser moves it off the stack before the action.
+**   *  A rule without a label on its left side gives the left side the
+**      value of the first symbol of its right side, as in C, if the rule
+**      has no label for that symbol.  If the left side then has no value
+**      of its own type, the parser panics when a later action reads it.
 **   *  The error symbol, destructors and %extra_context are not supported.
 **      Rust drops the values on the stack by itself.
 **
 ** The parser is used like the C parser: ParseAlloc() makes a parser, and
 ** Parse() takes one token for each call.  The token number 0 is the end of
-** the input.
+** the input.  Parse() panics for a token number that is not a terminal
+** symbol of the grammar.
 */
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #![allow(dead_code, unused_variables, unused_mut, unused_braces)]
@@ -410,6 +418,8 @@ fn yy_accept(yypParser: &mut yyParser) {
 ** None.
 */
 pub fn Parse(yypParser: &mut yyParser, yymajor: i32, yyminor: ParseTOKENTYPE) {
+    assert!(yymajor >= 0 && yymajor < YYNTOKEN,
+        "Parse: the token number is not a terminal symbol of the grammar");
     let yyendofinput = yymajor == 0; /* True if we are at the end of input */
     let mut yyact = yypParser.yystack[yypParser.yystack.len() - 1].stateno;
     if let Some(trace) = yypParser.yytrace {

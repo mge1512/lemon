@@ -46,11 +46,18 @@
 **   *  %token_type and the types of %type are Go types.
 **   *  %extra_argument has a type only, for example {*state}.  The code of
 **      the grammar reaches the value under the name yyarg.
+**   *  The code of an action is copied without change.  Each label of the
+**      rule is a local variable there.
+**   *  A rule without a label on its left side gives the left side the
+**      value of the first symbol of its right side, as in C.  If that
+**      symbol has another type, the value of the left side is not defined:
+**      it is the zero value or an old value of the same type.
 **   *  The error symbol, destructors and %extra_context are not supported.
 **
 ** The parser is used like the C parser: ParseAlloc() makes a parser, and
 ** Parse() takes one token for each call.  The token number 0 is the end of
-** the input.
+** the input.  Parse() panics for a token number that is not a terminal
+** symbol of the grammar.
 */
 %%
 /* These constants are the numbers of the terminal symbols.
@@ -442,6 +449,9 @@ func yy_accept(yypParser *yyParser) {
 ** None.
 */
 func Parse(yypParser *yyParser, yymajor int, yyminor ParseTOKENTYPE, yyarg ParseARGTYPE) {
+	if yymajor < 0 || yymajor >= YYNTOKEN {
+		panic("Parse: the token number is not a terminal symbol of the grammar")
+	}
 	yypParser.yyarg = yyarg
 	yyendofinput := yymajor == 0 /* True if we are at the end of input */
 	yyact := yypParser.yystack[len(yypParser.yystack)-1].stateno
