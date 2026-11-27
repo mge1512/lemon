@@ -52,7 +52,8 @@ original generator and the changed generator, runs both on the grammars in
 | `tool/lemon.c` | The generator with the changes of this repository |
 | `tool/lempar.c` | The C template, unchanged |
 | `tool/lempar.go`, `tool/lempar.rs` | The new templates |
-| `doc/` | Documentation |
+| `doc/lemon.html` | The original documentation, unchanged so far |
+| `doc/template-syntax.md` | The change of this repository: design and reference |
 | `test/` | Tests |
 
 ## Relation to SQLite
