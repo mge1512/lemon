@@ -472,7 +472,16 @@ func Parse(yypParser *yyParser, yymajor int, yyminor ParseTOKENTYPE, yyarg Parse
 		if yyact >= YY_MIN_REDUCE {
 			yyruleno := int(yyact) - YY_MIN_REDUCE /* Reduce by this rule */
 			if yyTrace != nil {
-				yyTrace("Reduce " + yyitoa(yyruleno) + " [" + yyRuleName[yyruleno] + "]")
+				yysize := int(yyRuleInfoNRhs[yyruleno])
+				zTail := "."
+				if yysize != 0 {
+					yytos := len(yypParser.yystack) - 1
+					zTail = ", pop back to state " + yyitoa(int(yypParser.yystack[yytos+yysize].stateno)) + "."
+				}
+				if yyruleno >= YYNRULE_WITH_ACTION {
+					zTail = " without external action" + zTail
+				}
+				yyTrace("Reduce " + yyitoa(yyruleno) + " [" + yyRuleName[yyruleno] + "]" + zTail)
 			}
 			/* Check that the stack is large enough to grow by a single entry
 			 ** if the RHS of the rule is empty.  This ensures that there is room
@@ -514,6 +523,15 @@ func Parse(yypParser *yyParser, yymajor int, yyminor ParseTOKENTYPE, yyarg Parse
 			}
 			break
 		}
+	}
+	if yyTrace != nil {
+		zStack := "Return. Stack="
+		cDiv := "["
+		for i := 1; i < len(yypParser.yystack); i++ {
+			zStack += cDiv + yyTokenName[yypParser.yystack[i].major]
+			cDiv = " "
+		}
+		yyTrace(zStack + "]")
 	}
 }
 

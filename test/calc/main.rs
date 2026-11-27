@@ -1,8 +1,9 @@
 // Test program for the calculator parser in Rust.
 //
-// Usage:  calc INPUTFILE
+// Usage:  calc INPUTFILE [trace]
 // Each line of the input file is one input for the parser. The program
-// prints one result line for each input line.
+// prints one result line for each input line. With the word "trace" it
+// also prints the trace messages of the parser.
 
 #[path = "calc-rs.rs"]
 mod calc;
@@ -10,12 +11,17 @@ mod calc;
 use calc::*;
 use std::io::BufRead;
 
+fn print_trace(msg: &str) {
+    println!("{}", msg);
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 2 {
-        eprintln!("usage: calc INPUTFILE");
+    if args.len() < 2 || args.len() > 3 {
+        eprintln!("usage: calc INPUTFILE [trace]");
         std::process::exit(2);
     }
+    let trace = args.len() == 3;
     let file = match std::fs::File::open(&args[1]) {
         Ok(f) => f,
         Err(e) => {
@@ -27,6 +33,9 @@ fn main() {
         let line = line.unwrap();
         let b = line.as_bytes();
         let mut p = CalcAlloc(CalcState::default());
+        if trace {
+            CalcTrace(&mut p, Some(print_trace));
+        }
         let mut i = 0;
         while i < b.len() {
             let c = b[i];

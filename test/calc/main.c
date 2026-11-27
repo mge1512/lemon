@@ -4,9 +4,10 @@
 ** The generated file calc.c is included here, so that this program sees
 ** the token numbers and the type of the parser state.
 **
-** Usage:  calc INPUTFILE
+** Usage:  calc INPUTFILE [trace]
 ** Each line of the input file is one input for the parser.  The program
-** prints one result line for each input line.
+** prints one result line for each input line.  With the word "trace" it
+** also prints the trace messages of the parser.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,10 +17,11 @@
 int main(int argc, char **argv){
   static char line[4096];
   FILE *in;
-  if( argc!=2 || (in = fopen(argv[1],"r"))==0 ){
-    fprintf(stderr,"usage: calc INPUTFILE\n");
+  if( argc<2 || argc>3 || (in = fopen(argv[1],"r"))==0 ){
+    fprintf(stderr,"usage: calc INPUTFILE [trace]\n");
     return 2;
   }
+  if( argc==3 ) CalcTrace(stdout, "");
   while( fgets(line,sizeof(line),in) ){
     struct calc_state st = {0,0,0,0};
     void *p = CalcAlloc(malloc);

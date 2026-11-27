@@ -438,7 +438,15 @@ pub fn Parse(yypParser: &mut yyParser, yymajor: i32, yyminor: ParseTOKENTYPE) {
         if (yyact as i32) >= YY_MIN_REDUCE {
             let yyruleno = (yyact as i32 - YY_MIN_REDUCE) as usize; /* Reduce by this rule */
             if let Some(trace) = yypParser.yytrace {
-                trace(&format!("Reduce {} [{}]", yyruleno, yyRuleName[yyruleno]));
+                let yysize = yyRuleInfoNRhs[yyruleno] as isize;
+                let zAction = if (yyruleno as i32) < YYNRULE_WITH_ACTION { "" } else { " without external action" };
+                if yysize != 0 {
+                    let yyback = (yypParser.yystack.len() as isize - 1 + yysize) as usize;
+                    trace(&format!("Reduce {} [{}]{}, pop back to state {}.",
+                        yyruleno, yyRuleName[yyruleno], zAction, yypParser.yystack[yyback].stateno));
+                } else {
+                    trace(&format!("Reduce {} [{}]{}.", yyruleno, yyRuleName[yyruleno], zAction));
+                }
             }
             /* Check that the stack is large enough to grow by a single entry
             ** if the RHS of the rule is empty.  This ensures that there is room
@@ -482,6 +490,17 @@ pub fn Parse(yypParser: &mut yyParser, yymajor: i32, yyminor: ParseTOKENTYPE) {
             }
             break;
         }
+    }
+    if let Some(trace) = yypParser.yytrace {
+        let mut zStack = String::from("Return. Stack=");
+        let mut cDiv = '[';
+        for yyentry in yypParser.yystack.iter().skip(1) {
+            zStack.push(cDiv);
+            zStack.push_str(yyTokenName[yyentry.major as usize]);
+            cDiv = ' ';
+        }
+        zStack.push(']');
+        trace(&zStack);
     }
 }
 

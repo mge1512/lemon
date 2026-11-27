@@ -12,9 +12,12 @@
 # Part 2  Errors in the %%syntax lines of a template, and the limits of a
 #         template that has such lines.
 # Part 3  One calculator with each template (C, Go, Rust). The parsers run
-#         on the same inputs and must print the same results.
+#         on the same inputs and must print the same results. The Go and
+#         Rust parsers must also print the trace messages of the C
+#         parser: every step, with the numbers of the states.
 # Part 4  Recognizers without actions with each template. The parsers must
-#         accept the same statements and refuse the others at the same token.
+#         accept the same statements and refuse the others at the same
+#         token, with the same trace messages.
 # Part 5  The limits of the Go and Rust templates. A grammar that uses a
 #         feature without support must not compile, and the message of the
 #         compiler must name the feature.
@@ -151,6 +154,17 @@ go_build() {
   GOTOOLCHAIN=local GOFLAGS=-mod=mod "$GO" build -o "$1" .
 }
 
+# check_trace LABEL TRACE-FILE TRACE-FILE-OF-C
+# The trace has every step of the parser, with the numbers of the states.
+# It must be the same as the trace of the C parser.
+check_trace() {
+  if [ -s "$3" ] && cmp -s "$2" "$3"; then
+    pass "trace of the $1: the $(wc -l <"$2" | tr -d ' ') lines of the C parser"
+  else
+    fail "trace of the $1 differs from the C parser (see $2)"
+  fi
+}
+
 echo "== part 3: the same calculator with each template"
 CALC="$BUILD/calc"
 INPUTS="$ROOT/test/calc/inputs.txt"
@@ -160,7 +174,8 @@ mkdir -p "$CALC/c" "$CALC/go" "$CALC/rust"
 ( cd "$CALC/c" &&
   "$BUILD/lemon" "-T$ROOT/tool/lempar.c" -d. "$ROOT/test/grammars/calc.y" &&
   "$CC" -o calc -I. "$ROOT/test/calc/main.c" &&
-  ./calc "$INPUTS" >result.txt ) >"$CALC/c/log.txt" 2>&1
+  ./calc "$INPUTS" >result.txt &&
+  ./calc "$INPUTS" trace >trace.txt ) >"$CALC/c/log.txt" 2>&1
 check_result "calculator in C" "$CALC/c/result.txt" "$EXPECTED"
 
 if have "$GO"; then
@@ -168,8 +183,10 @@ if have "$GO"; then
     "$BUILD/lemon" "-T$ROOT/tool/lempar.go" -d. "$ROOT/test/calc/calc-go.y" &&
     cp "$ROOT/test/calc/main.go" . &&
     go_build calc &&
-    ./calc "$INPUTS" >result.txt ) >"$CALC/go/log.txt" 2>&1
+    ./calc "$INPUTS" >result.txt &&
+    ./calc "$INPUTS" trace >trace.txt ) >"$CALC/go/log.txt" 2>&1
   check_result "calculator in Go" "$CALC/go/result.txt" "$EXPECTED"
+  check_trace "calculator in Go" "$CALC/go/trace.txt" "$CALC/c/trace.txt"
 else
   skip "calculator in Go: no $GO command"
 fi
@@ -179,8 +196,10 @@ if have "$RUSTC"; then
     "$BUILD/lemon" "-T$ROOT/tool/lempar.rs" -d. "$ROOT/test/calc/calc-rs.y" &&
     cp "$ROOT/test/calc/main.rs" . &&
     "$RUSTC" --edition 2021 -o calc main.rs &&
-    ./calc "$INPUTS" >result.txt ) >"$CALC/rust/log.txt" 2>&1
+    ./calc "$INPUTS" >result.txt &&
+    ./calc "$INPUTS" trace >trace.txt ) >"$CALC/rust/log.txt" 2>&1
   check_result "calculator in Rust" "$CALC/rust/result.txt" "$EXPECTED"
+  check_trace "calculator in Rust" "$CALC/rust/trace.txt" "$CALC/c/trace.txt"
 else
   skip "calculator in Rust: no $RUSTC command"
 fi
@@ -208,7 +227,8 @@ recognizer() {
              line = line (i>1?" ":"") num[$i]
            }
            print line }' aql.h "$src/$name/statements.txt" >../numbers.txt &&
-    ./recognizer ../numbers.txt >result.txt ) >"$dir/c/log.txt" 2>&1
+    ./recognizer ../numbers.txt >result.txt &&
+    ./recognizer ../numbers.txt trace >trace.txt ) >"$dir/c/log.txt" 2>&1
   check_result "recognizer $name in C" "$dir/c/result.txt" "$expected"
 
   if have "$GO"; then
@@ -217,8 +237,10 @@ recognizer() {
       "$BUILD/lemon" "-T$ROOT/tool/lempar.go" -d. aql.y &&
       cp "$src/main.go" . &&
       go_build recognizer &&
-      ./recognizer ../numbers.txt >result.txt ) >"$dir/go/log.txt" 2>&1
+      ./recognizer ../numbers.txt >result.txt &&
+      ./recognizer ../numbers.txt trace >trace.txt ) >"$dir/go/log.txt" 2>&1
     check_result "recognizer $name in Go" "$dir/go/result.txt" "$expected"
+    check_trace "recognizer $name in Go" "$dir/go/trace.txt" "$dir/c/trace.txt"
   else
     skip "recognizer $name in Go: no $GO command"
   fi
@@ -229,8 +251,10 @@ recognizer() {
       "$BUILD/lemon" "-T$ROOT/tool/lempar.rs" -d. aql.y &&
       cp "$src/main.rs" . &&
       "$RUSTC" --edition 2021 -o recognizer main.rs &&
-      ./recognizer ../numbers.txt >result.txt ) >"$dir/rust/log.txt" 2>&1
+      ./recognizer ../numbers.txt >result.txt &&
+      ./recognizer ../numbers.txt trace >trace.txt ) >"$dir/rust/log.txt" 2>&1
     check_result "recognizer $name in Rust" "$dir/rust/result.txt" "$expected"
+    check_trace "recognizer $name in Rust" "$dir/rust/trace.txt" "$dir/c/trace.txt"
   else
     skip "recognizer $name in Rust: no $RUSTC command"
   fi

@@ -1,8 +1,9 @@
 // Test program for the calculator parser in Go.
 //
-// Usage:  calc INPUTFILE
+// Usage:  calc INPUTFILE [trace]
 // Each line of the input file is one input for the parser. The program
-// prints one result line for each input line.
+// prints one result line for each input line. With the word "trace" it
+// also prints the trace messages of the parser.
 package main
 
 import (
@@ -13,8 +14,8 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: calc INPUTFILE")
+	if len(os.Args) < 2 || len(os.Args) > 3 {
+		fmt.Fprintln(os.Stderr, "usage: calc INPUTFILE [trace]")
 		os.Exit(2)
 	}
 	in, err := os.Open(os.Args[1])
@@ -23,6 +24,9 @@ func main() {
 		os.Exit(2)
 	}
 	defer in.Close()
+	if len(os.Args) == 3 {
+		CalcTrace(func(msg string) { fmt.Println(msg) })
+	}
 	single := map[byte]int{
 		'+': TK_PLUS, '-': TK_MINUS, '*': TK_TIMES, '/': TK_DIVIDE, '^': TK_POW,
 		'(': TK_LPAREN, ')': TK_RPAREN, ',': TK_COMMA, ';': TK_SEMI,

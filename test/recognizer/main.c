@@ -1,10 +1,12 @@
 /*
 ** Test program for the recognizer in C.
 **
-** Usage:  recognizer INPUTFILE
+** Usage:  recognizer INPUTFILE [trace]
 ** Each line of the input file is a list of token numbers.  The program
 ** prints "accept", or "refuse at N" where N is the place of the first
 ** token that the parser refuses.  The end of the input counts as a token.
+** With the word "trace" the program also prints the trace messages of the
+** parser.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,10 +15,11 @@
 int main(int argc, char **argv){
   static char line[4096];
   FILE *in;
-  if( argc!=2 || (in = fopen(argv[1],"r"))==0 ){
-    fprintf(stderr,"usage: recognizer INPUTFILE\n");
+  if( argc<2 || argc>3 || (in = fopen(argv[1],"r"))==0 ){
+    fprintf(stderr,"usage: recognizer INPUTFILE [trace]\n");
     return 2;
   }
+  if( argc==3 ) AqlTrace(stdout, "");
   while( fgets(line,sizeof(line),in) ){
     void *p = AqlAlloc(malloc);
     char *z = line;
