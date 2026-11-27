@@ -23,8 +23,9 @@ original are easy to see.
 
 ## Status
 
-Started on 2026-11-27. This is a proof of concept. It passes its tests, and
-no product uses it yet.
+Started on 2026-11-27. The first release is 0.1.0, and `CHANGELOG.md` lists
+the releases. This is a proof of concept. It passes its tests, and no product
+uses it yet.
 
 What works:
 
@@ -117,6 +118,7 @@ and no report of a sanitizer.
 | `tool/lempar.go`, `tool/lempar.rs` | The new templates |
 | `doc/` | The documents of the table above |
 | `test/` | The test script, the grammars and the test programs |
+| `CHANGELOG.md` | The releases and what they changed |
 | `LICENSE.md` | The terms: public domain |
 
 The command `diff -u upstream/tool/lemon.c tool/lemon.c` shows all changes
