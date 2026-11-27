@@ -21,10 +21,18 @@ The first new templates are for Go and Rust.
 Started on 2026-11-27. This is work in progress.
 
 - [x] Original files of SQLite 3.54.1 in `upstream/`
-- [ ] Test: C output identical to the original generator
+- [x] Test: C output identical to the original generator
 - [ ] Generator: syntax of the target language comes from the template
 - [ ] Template for Go
 - [ ] Template for Rust
+
+## Test
+
+    sh test/run.sh
+
+The script needs a C compiler and standard shell tools. It builds the
+original generator and the changed generator, runs both on the grammars in
+`upstream/` and `test/grammars/`, and compares all output files.
 
 ## Rules of this repository
 
