@@ -111,17 +111,22 @@ and no report of a sanitizer.
 | `tool/lempar.go`, `tool/lempar.rs` | The new templates |
 | `doc/` | The documents of the table above |
 | `test/` | The test script, the grammars and the test programs |
+| `LICENSE.md` | The terms: public domain |
 
 The command `diff -u upstream/tool/lemon.c tool/lemon.c` shows all changes
 of the generator.
+
+## Who made this
+
+This repository belongs to Matthias G. Eckermann <mge@mailbox.org>.
+
+An AI coding agent (Claude, by Anthropic) wrote the changes in this
+repository, at his direction. The commits name the agent.
 
 ## Relation to SQLite
 
 This repository is not part of SQLite, and the SQLite developers have not
 reviewed it.
-
-An AI coding agent (Claude, by Anthropic) wrote the changes in this
-repository, at the direction of the repository owner.
 
 The SQLite project states two rules in its `AGENTS.md`. It takes no pull
 requests without prior agreement and public-domain paperwork. And it does not
@@ -131,9 +136,11 @@ It is not a submission to SQLite.
 
 ## License
 
+Public domain, after the example of the original Lemon.
+
 The files in `upstream/` come from SQLite, which is in the public domain. This
 repository keeps them unchanged, with their original header comments.
 
-The repository owner has not yet stated the terms for the files that this
-repository adds. Until the owner adds that statement, only the files in
-`upstream/` have clear terms.
+Matthias G. Eckermann, the owner of this repository, disclaims copyright to
+all other files. Anyone can use them for any purpose. `LICENSE.md` has the
+same statement.
