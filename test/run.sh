@@ -15,9 +15,12 @@
 #         on the same inputs and must print the same results.
 # Part 4  Recognizers without actions with each template. The parsers must
 #         accept the same statements and refuse the others at the same token.
+# Part 5  The limits of the Go and Rust templates. A grammar that uses a
+#         feature without support must not compile, and the message of the
+#         compiler must name the feature.
 #
 # The script needs a C compiler (CC, default cc) and standard shell tools.
-# Parts 3 and 4 use a Go compiler (GO, default go) and a Rust compiler
+# Parts 3 to 5 use a Go compiler (GO, default go) and a Rust compiler
 # (RUSTC, default rustc) when they are there. Without one of them, the
 # script skips the tests for that language and says so.
 #
@@ -222,6 +225,54 @@ recognizer() {
 echo "== part 4: recognizers without actions with each template"
 recognizer query
 recognizer fallback
+
+# ---------------------------------------------------------------------------
+# Part 5
+
+# template_limit LANG LABEL EXPECTED-TEXT HEAD-LINE RULE-LINE
+# LANG is go or rs. Adds one line to the head or to the rules of the
+# fallback grammar. The generator must write the parser. The compiler must
+# refuse the parser with a message that has the expected text.
+template_limit() {
+  lang=$1; label=$2; expected=$3; headline=$4; ruleline=$5
+  src="$ROOT/test/recognizer"
+  dir="$BUILD/limit-$(echo "$label" | tr -c 'A-Za-z0-9\n' '-')"
+  mkdir -p "$dir"
+  ( cd "$dir" &&
+    { cat "$src/head-$lang.y"; echo "$headline"
+      cat "$src/fallback/rules.y"; echo "$ruleline"; } >aql.y &&
+    "$BUILD/lemon" "-T$ROOT/tool/lempar.$lang" -d. aql.y &&
+    cp "$src/main.$lang" . &&
+    echo done >generator-done.txt ) >"$dir/log.txt" 2>&1
+  ( cd "$dir" && [ -f generator-done.txt ] &&
+    if [ "$lang" = go ]; then go_build recognizer
+    else "$RUSTC" --edition 2021 -o recognizer main.rs; fi ) >"$dir/compiler.txt" 2>&1
+  status=$?
+  if [ -f "$dir/generator-done.txt" ] && [ "$status" -ne 0 ] &&
+     grep -q -F "$expected" "$dir/compiler.txt"; then
+    pass "refused by the compiler: $label"
+  else
+    fail "not refused by the compiler: $label (see $dir)"
+  fi
+}
+
+echo "== part 5: limits of the Go and Rust templates"
+if have "$GO"; then
+  template_limit go "error symbol in Go" "this_template_has_no_error_symbol" \
+    "" "stmt ::= error."
+  template_limit go "%extra_context in Go" "this_template_has_no_extra_context" \
+    "%extra_context {*int}" ""
+else
+  skip "limits of the Go template: no $GO command"
+fi
+if have "$RUSTC"; then
+  template_limit rs "error symbol in Rust" "this template has no error symbol" \
+    "" "stmt ::= error."
+  template_limit rs "%extra_context in Rust" "this_template_has_no_extra_context" \
+    "%extra_context {i32}" ""
+else
+  skip "limits of the Rust template: no $RUSTC command"
+fi
 
 echo "== result: $PASSED passed, $FAILED failed, $SKIPPED skipped"
 [ "$FAILED" -eq 0 ]

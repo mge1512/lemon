@@ -64,9 +64,12 @@
 %%
 /************* End control definitions *****************************************/
 
-/* This template does not support the error symbol.  The next line does not
-** compile for a grammar that uses it. */
-var _ = [1]struct{}{}[YYERRORSYMBOL]
+/* This template does not support the error symbol.  The constant below
+** does not compile for a grammar that uses it, and the message of the
+** compiler has the name of the type. */
+type yy_this_template_has_no_error_symbol uint8
+
+const _ = yy_this_template_has_no_error_symbol(0 - YYERRORSYMBOL)
 
 /* Next are the tables used to determine what action to take based on the
 ** current state and lookahead token.  The comment in lempar.c describes

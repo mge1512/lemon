@@ -75,7 +75,7 @@
 
 /* This template does not support the error symbol.  The next line does not
 ** compile for a grammar that uses it. */
-const _: () = assert!(YYERRORSYMBOL == 0);
+const _: () = assert!(YYERRORSYMBOL == 0, "this template has no error symbol");
 
 /* Next are the tables used to determine what action to take based on the
 ** current state and lookahead token.  The comment in lempar.c describes
