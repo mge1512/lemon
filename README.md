@@ -16,6 +16,11 @@ This repository changes the generator so that the template defines the syntax
 of the target language. A new target language is then one new template file.
 The first new templates are for Go and Rust.
 
+The name lemongrass says that this is not the original Lemon. The letters
+"gr" come from Go and Rust, the first two new target languages. The source
+files keep their names, `lemon.c` and `lempar.c`, so that the changes to the
+original are easy to see.
+
 ## Status
 
 Started on 2026-11-27. This is a proof of concept. It passes its tests, and
