@@ -24,7 +24,7 @@ Started on 2026-11-27. This is work in progress.
 - [x] Test: C output identical to the original generator
 - [x] Generator: syntax of the target language comes from the template
 - [x] Template for Go
-- [ ] Template for Rust
+- [x] Template for Rust
 
 ## Test
 

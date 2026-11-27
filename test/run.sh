@@ -10,7 +10,8 @@
 # standard output and the exit status must be the same.
 #
 # The script needs a C compiler (CC, default cc) and standard shell tools.
-# Part 3 also uses a Go compiler (GO, default go) when there is one.
+# Part 3 also uses a Go compiler (GO, default go) and a Rust compiler (RUSTC,
+# default rustc) when they are there.
 # It writes only below the directory build/.
 
 set -u
@@ -108,7 +109,7 @@ check_calc() {
 
 echo "== part 3: the same calculator with each template"
 CALC="$BUILD/calc"
-mkdir -p "$CALC/c" "$CALC/go"
+mkdir -p "$CALC/c" "$CALC/go" "$CALC/rust"
 
 ( cd "$CALC/c" &&
   "$BUILD/lemon" "-T$ROOT/tool/lempar.c" -d. "$ROOT/test/grammars/calc.y" &&
@@ -127,6 +128,18 @@ if command -v "$GO" >/dev/null 2>&1; then
   check_calc Go "$CALC/go/result.txt"
 else
   echo "skip  calculator in Go: no $GO command"
+fi
+
+RUSTC=${RUSTC:-rustc}
+if command -v "$RUSTC" >/dev/null 2>&1; then
+  ( cd "$CALC/rust" &&
+    "$BUILD/lemon" "-T$ROOT/tool/lempar.rs" -d. "$ROOT/test/calc/calc-rs.y" &&
+    cp "$ROOT/test/calc/main.rs" . &&
+    "$RUSTC" --edition 2021 -o calc main.rs &&
+    ./calc "$ROOT/test/calc/inputs.txt" >result.txt ) >"$CALC/rust/log.txt" 2>&1
+  check_calc Rust "$CALC/rust/result.txt"
+else
+  echo "skip  calculator in Rust: no $RUSTC command"
 fi
 
 echo "== result: $PASSED passed, $FAILED failed"
