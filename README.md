@@ -18,27 +18,73 @@ The first new templates are for Go and Rust.
 
 ## Status
 
-Started on 2026-11-27. This is work in progress.
+Started on 2026-11-27. This is a proof of concept. It passes its tests, and
+no product uses it yet.
 
-- [x] Original files of SQLite 3.54.1 in `upstream/`
-- [x] Test: C output identical to the original generator
-- [x] Generator: syntax of the target language comes from the template
-- [x] Template for Go
-- [x] Template for Rust
+What works:
+
+- With the C template, the changed generator writes the same files as the
+  original generator of SQLite 3.54.1, byte for byte.
+- `tool/lempar.go` and `tool/lempar.rs` are translations of `lempar.c`. For
+  three grammars the Go and Rust parsers give the same results as the C
+  parser. They also take the same steps: the trace messages are the same.
+- The generator checks a template before it reads the grammar. It refuses a
+  template with a wrong `%%syntax` line or without a required one.
+
+What is not there:
+
+- Destructors, `%realloc`, `%free`, `%stack_size_limit` and the option `-m`
+  work only with the C template.
+- The Go and Rust templates have no error symbol and no `%extra_context`.
+- The original documentation `doc/lemon.html` does not describe the change.
+
+## Use
+
+    cc -O2 -o lemon tool/lemon.c
+    ./lemon -Ttool/lempar.c  query.y
+    ./lemon -Ttool/lempar.go query.y
+    ./lemon -Ttool/lempar.rs query.y
+
+The first command builds the generator. The other commands write a parser
+for the grammar `query.y`: `query.c` with `query.h`, `query.go` or
+`query.rs`.
+
+| Document | For |
+|---|---|
+| `doc/go-and-rust.md` | People who write a grammar for Go or Rust |
+| `doc/template-syntax.md` | People who write a template for another language |
+| `doc/lemon.html` | The grammar language. This is the original documentation. |
+
+The generator is a build tool for input that you trust, as the original is.
+A grammar file and a template are code. Do not run the generator on files
+from a source that you do not know.
 
 ## Test
 
     sh test/run.sh
 
-The script needs a C compiler and standard shell tools. It has three parts:
+The script needs a C compiler and standard shell tools. It uses a Go
+compiler and a Rust compiler when they are there, and it says which tests
+it skips without them. It writes only below `build/`. It has five parts:
 
-1. It builds the original generator and the changed generator, runs both on
-   the grammars in `upstream/` and `test/grammars/`, and compares all output
-   files.
-2. It checks that the generator refuses wrong `%%syntax` lines.
-3. It builds one calculator with each template, runs the parsers on the
-   same inputs and compares the results. A language without a compiler on
-   the machine is skipped.
+1. It builds the original generator and the changed generator. It runs both
+   on four grammars with eight sets of options. It compares all output
+   files, the messages and the exit status. One of the grammars is the SQL
+   grammar of SQLite.
+2. It checks that the generator refuses wrong `%%syntax` lines, and
+   grammars that a template with such lines cannot have.
+3. It builds one calculator with each template and runs the parsers on the
+   same inputs. The results must be the expected lines. The trace of the Go
+   parser and of the Rust parser must be the trace of the C parser.
+4. It does the same for two recognizers without actions. One has the 94
+   rules of a query language. The other uses fallback tokens, a wildcard
+   token and a token class.
+5. It makes parsers for grammars with the error symbol and with
+   `%extra_context`. The Go and Rust compilers must refuse them with a
+   message that names the feature.
+
+The last result with gcc 13.3.0, Go 1.24.7 and rustc 1.97.0 was "60 passed,
+0 failed, 0 skipped".
 
 ## Rules of this repository
 
@@ -58,9 +104,11 @@ The script needs a C compiler and standard shell tools. It has three parts:
 | `tool/lemon.c` | The generator with the changes of this repository |
 | `tool/lempar.c` | The C template, unchanged |
 | `tool/lempar.go`, `tool/lempar.rs` | The new templates |
-| `doc/lemon.html` | The original documentation, unchanged so far |
-| `doc/template-syntax.md` | The change of this repository: design and reference |
-| `test/` | Tests |
+| `doc/` | The documents of the table above |
+| `test/` | The test script, the grammars and the test programs |
+
+The command `diff -u upstream/tool/lemon.c tool/lemon.c` shows all changes
+of the generator.
 
 ## Relation to SQLite
 
