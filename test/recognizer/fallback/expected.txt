@@ -1,0 +1,10 @@
+accept
+accept
+accept
+accept
+accept
+refuse at 6
+refuse at 2
+refuse at 2
+accept
+accept
