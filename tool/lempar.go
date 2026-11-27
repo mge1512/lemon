@@ -1,6 +1,7 @@
 %%syntax file-suffix ".go"
 %%syntax line "//line $FILE:$LINE\n"
 %%syntax default-token-type "struct{}"
+%%syntax literal-quotes "\"'`"
 %%syntax const "const $NAME = $VALUE\n"
 %%syntax type "type $NAME = $TYPE\n"
 %%syntax token "const $NAME = $VALUE\n"
@@ -48,6 +49,10 @@
 **      the grammar reaches the value under the name yyarg.
 **   *  The code of an action is copied without change.  Each label of the
 **      rule is a local variable there.
+**   *  The generator must find the end of each code block of the grammar.
+**      It reads the three kinds of quotes of Go as the limits of a literal,
+**      and a backslash before a quote as an escape.  For this reason a raw
+**      string must not end with a backslash.
 **   *  A rule without a label on its left side gives the left side the
 **      value of the first symbol of its right side, as in C.  If that
 **      symbol has another type, the value of the left side is not defined:

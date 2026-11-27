@@ -12,6 +12,10 @@ package main
 
 type calcList struct{ n, sum int }
 type calcState struct{ result, count, nError, accepted int }
+
+// A raw string and a rune with a brace. The generator must read both as
+// literals to find the end of this code block.
+const calcOpen, calcClose = `{`, '}'
 }
 %left PLUS MINUS.
 %left TIMES DIVIDE.

@@ -12,6 +12,10 @@ pub struct CalcList { n: i64, sum: i64 }
 
 #[derive(Default)]
 pub struct CalcState { pub result: i64, pub count: i64, pub nError: i64, pub accepted: i64 }
+
+// A lifetime. The generator must not read an apostrophe as the start
+// of a character literal to find the end of this code block.
+pub fn calc_label<'a>(name: &'a str) -> &'a str { name }
 }
 %left PLUS MINUS.
 %left TIMES DIVIDE.

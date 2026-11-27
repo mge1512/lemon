@@ -1,6 +1,7 @@
 %%syntax file-suffix ".rs"
 %%syntax line ""
 %%syntax default-token-type "()"
+%%syntax literal-quotes "\""
 %%syntax const "pub const $NAME: i32 = $VALUE;\n"
 %%syntax type "pub type $NAME = $TYPE;\n"
 %%syntax token "pub const $NAME: i32 = $VALUE;\n"
@@ -47,9 +48,12 @@
 **   *  %extra_argument has a type only, for example {State}.  The parser
 **      owns a value of this type.  The code of the grammar reaches it under
 **      the name yyarg, and the caller reaches it as the field yyarg.
-**   *  The code blocks of the grammar must not have a lifetime such as 'a,
-**      because the generator reads the apostrophe as the start of a
-**      character.
+**   *  The generator must find the end of each code block of the grammar.
+**      It reads double quotes as the limits of a string, but it does not
+**      read character literals, because an apostrophe is also the start
+**      of a lifetime.  For this reason write a brace or a double quote in
+**      a character literal as an escape ('\x7b', '\x7d', '\x22'), and do
+**      not put a double quote in a raw string.
 **   *  The code of an action is copied without change.  Each label of the
 **      rule is a local variable there.  The variable owns the value: the
 **      parser moves it off the stack before the action.

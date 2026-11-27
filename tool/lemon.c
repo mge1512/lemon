@@ -3195,6 +3195,7 @@ void Parse(struct lemon *gp)
       }
     }else if( c=='{' ){               /* A block of C code */
       int level;
+      const char *zQuote = tplt_syntax("literal-quotes");
       cp++;
       for(level=1; (c= *cp)!=0 && (level>1 || c!='}'); cp++){
         if( c=='\n' ) lineno++;
@@ -3213,7 +3214,8 @@ void Parse(struct lemon *gp)
           cp = &cp[2];
           while( (c= *cp)!=0 && c!='\n' ) cp++;
           if( c ) lineno++;
-        }else if( c=='\'' || c=='\"' ){    /* String a character literals */
+        }else if( zQuote ? strchr(zQuote,c)!=0 : (c=='\'' || c=='\"') ){
+          /* String and character literals */
           int startchar, prevc;
           startchar = c;
           prevc = 0;
@@ -3767,6 +3769,7 @@ static struct {
   { "file-suffix",        "",                     0, 0 },
   { "line",               "LINE FILE",            0, 0 },
   { "default-token-type", "",                     0, 0 },
+  { "literal-quotes",     "",                     0, 0 },
   { "const",              "NAME VALUE",           0, 0 },
   { "type",               "NAME TYPE",            0, 0 },
   { "token",              "NAME VALUE",           0, 0 },
